@@ -4,15 +4,49 @@ Data Cleaning:
 
 [] Should we remove data points that are repetitive? For example: Monthly Income and Description of Income Range, these are essentially the same data. Are we over-representing the data point in our model if we include both? Which algorithms can handle this? 
 
+Combine and put weight to variables. 
+Don't have to worry about this because they are correlated. 
+
 [] What are negative months employed? How should we handle this?
+NA and imputate. 
 
 [] For scorex, should we keep the ordinal data as a factor or convert it to numeric? 
+Convert to numeric.
 
 [] For DTI, the description says the ratio should be between 0 and 1 but there are cases were it is above 1. What is happening here? How do we handle the cases with the 1,000,000 value?
+Leave those in there. Infer what the missing value is. Imputation. MICE, set as N/a and run imputation model. 
 
 [] Can we remove outliers for some of the variables? Our idea-- remove top 5% and bottom 5% for variables such as income. Problem-- will this lead to overfitting?/ can we do this 
+No dont do this. 
+Mean +- 3 sigma
 
 Project Goal:
 [] How can we measure the value of our customers? Would that influence which data we select to train our model? Should we consider diversification?
+Not consider interest rate, Interest rate is decided after bidding ends. Dont predict from that. Can calculate a baseline to see what interest rate you'll make money on. Have to remove dependent on interest rate variables. 
+
+Find loans that will over or under perform credit rating. Build model without credit rating -> built on top of other ratings. Run model with summary and without. Will give more information.
+
+Doesnt matter if they default if they have the correct premium. What determines interest rate is major question. 
 
 [] What types of data visulizations should we build? 
+
+
+To Do:
+
+[] Remove interest rate 
+
+[] Convert scorex to numeric
+
+[] Look into weekend effect, weekday vs weekend loans
+
+[] Partition even further from quarter to month
+
+[] Create combined variables with weight (1 * 30 days deliquents, 2 * 60 days deliquents) & ratios
+
+[] Color coded map of states with highest defaults / default ratio
+
+[] Imputation for the variables we do not know of. MICE, set as N/a and run imputation model. 
+
+[] Remove aggregate variables and run two models 
+
+[x] Take the ten highest cities and use that for interesting explorations
