@@ -1,0 +1,18 @@
+Questions For Group Project
+
+Data Cleaning:
+
+[] Should we remove data points that are repetitive? For example: Monthly Income and Description of Income Range, these are essentially the same data. Are we over-representing the data point in our model if we include both? Which algorithms can handle this? 
+
+[] What are negative months employed? How should we handle this?
+
+[] For scorex, should we keep the ordinal data as a factor or convert it to numeric? 
+
+[] For DTI, the description says the ratio should be between 0 and 1 but there are cases were it is above 1. What is happening here? How do we handle the cases with the 1,000,000 value?
+
+[] Can we remove outliers for some of the variables? Our idea-- remove top 5% and bottom 5% for variables such as income. Problem-- will this lead to overfitting?/ can we do this 
+
+Project Goal:
+[] How can we measure the value of our customers? Would that influence which data we select to train our model? Should we consider diversification?
+
+[] What types of data visulizations should we build? 
