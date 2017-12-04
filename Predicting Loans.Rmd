@@ -34,6 +34,9 @@ listings$loan_status[listings$loan_status == 3] <- 2
 listings$loan_origination_date <- as.Date(listings$loan_origination_date, "%d/%m/%Y")
 listings$loan_origination_date <- as.numeric(listings$loan_origination_date)
 
+# remove NAs
+listings <- listings[complete.cases(listings),]
+
 
 ```
 Scorex is the credit score of the user, it goes from < 600, to 778+. 
@@ -134,6 +137,56 @@ plot
 
 ## Data Models
 
+# Data Prediction using Logistic Regression
+
+```{r}
+logit.model <- glm(default ~ ., data = listings, family = "binomial")
+summary(logit.model)
+
+# Predicting the probability of an employee leaving using the Logit model
+listings_logit <- NULL
+listings_logit$default <- predict(logit.model, newdata = listings, type = "response")
+
+# Converting probabilities to a binary outcome (1 for Prob > 0.5, otherwise 0)
+listings_logit$default[listings_logit$default > 0.5] <- 1
+listings_logit$default[listings_logit$default != 1] <- 0
+
+# Creating a cross table to verify the accuracy of the Logit model
+CrossTable(x = listings_logit$default, y = listings[26834:33542, 11], prop.chisq = FALSE)
+```
+
+# Getting Data Ready for Machine Learning Models
+
+```{r}
+# Randomizing  dataset
+listings_random <- listings[sample(nrow(listings)),]
+
+# Rescaling listings dataset using Min-Max Normalization
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+  }
+listings_n <- as.data.frame(lapply(listings_random[31:40], normalize))
+str(listings_n)
+
+# Subsetting listings dataset with 33542 enteries into test and train subsets, where 80% entries (26,833) are test and 20% entries (6,709) are train
+listings_train <- listings_n[1:26833, 1:10]
+listings_train_label <- listings_random[1:26833, 3]
+
+listings_test <- listings_n[26834:33542, 1:10]
+listings_test_label <- listings_random[26834:33542, 3]
+
+```
+
+# Data Prediction using kNN
+
+```{r}
+listings_predict <- knn(train = listings_train, test = listings_test,
+                      cl = listings_train_label, k = 183) 
+                      # k = sqrt(population size: 33542) = 183 
+# confusion matrix
+CrossTable(x = listings_test_label, y = listings_predict, 
+           prop.chisq=FALSE)
+```
 
 
 
