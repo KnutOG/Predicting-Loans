@@ -5,12 +5,22 @@ date: "12/3/2017"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
 
+## Libraries and Data Setup 
+```{r}
 library(lubridate)
-
+library(gmodels)
+library(ggplot2)
+library(dplyr)
 listings <- read.csv("Listings2013.csv")
+```
+
+## Data Cleaning
+```{r}
+
+sapply(data, function(x) sum(is.na(x)))
+
+
 
 listings$number_of_days <- NULL
 listings$principal_balance <- NULL
@@ -25,25 +35,105 @@ listings$loan_origination_date <- as.Date(listings$loan_origination_date, "%d/%m
 listings$loan_origination_date <- as.numeric(listings$loan_origination_date)
 
 
+```
+Scorex is the credit score of the user, it goes from < 600, to 778+. 
+```{r}
+
+scorex <- listings %>%
+    group_by(scorex) %>%
+    summarise(count = n())
+
+plot<-ggplot(data=scorex, aes(x=scorex, y=count, fill =scorex))+
+  geom_bar(stat="identity" , position = "dodge")
+plot
+```
+ 
+Prosper Score is a score from 1-11 with 1 being lowest risk. Because this is a score that we did not create we don't know what went into it. In addition the data they are using is probably the same data we are using so it does not provide any novel new information to the model. Lets remove it.
+```{r}
+listings$prosper_score <- NULL
+```
+
+listings category ID is a category of the Loan but there is no description to go along with the IDs. This information might be useful though. NNot sure what to do with this.
+```{r}
 
 ```
 
-## R Markdown
+Income range, Income Range Description, Stated Monthly Income. We don't want this datapoint to be overrepresented in the model. Therefore we only need one of these variables. Lets go with Stated Monthly Income since it is more granular than the broad income range. 
+TO DO: Some of the algorithms will find that they are highly correlated and won't "Count them as double"... which ones?
+```{r}
+listings$income_range   <- NULL
+listings$income_range_description  <- NULL
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+income <- listings %>%
+    group_by(stated_monthly_income) %>%
+    summarise(count = n())
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+str(listings$stated_monthly_income)
+plot<-ggplot(data=listings, aes(listings$stated_monthly_income))+
+  geom_histogram(binwidth = 250) + xlim(0, 50000)
+plot
 ```
 
-## Including Plots
+Income Verifiable, looks good and useful. Have to modify to be a factor first. 
+```{r}
 
-You can also embed plots, for example:
+listings$income_verifiable <- factor(listings$income_verifiable)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+verifiable <- listings %>%
+    group_by(income_verifiable) %>%
+    summarise(count = n())
+
+plot<-ggplot(data=verifiable, aes(x=income_verifiable, y=count, fill=income_verifiable))+
+  geom_bar(stat="identity" , position = "dodge")
+plot
+
+plot<-ggplot(data= listings, aes(x=income_verifiable, y=stated_monthly_income)) + geom_boxplot()  +   coord_cartesian(ylim=c(0, 15000))
+plot
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+DTI WProsper Loan, debt to income ratio.
+```{r}
+loanRatioOne <- listings %>%
+    filter(dti_wprosper_loan > 1) %>%
+    summarise(count = n())
+loanMax <- listings %>%
+    filter(dti_wprosper_loan == 1000000) %>%
+    summarise(count = n())
+loanInBetween <- listings %>%
+    filter(dti_wprosper_loan < 1000000  & dti_wprosper_loan > 1) %>%
+    summarise(count = n())
+
+
+
+```
+TO DO: Why does this have to be a value less than 1?
+
+
+Employment Status Description & Employment.
+There are blank values for occupation when someone chooses "Other for Employment Status Description". Lets fix this. 
+```{r}
+
+
+levels(listings$occupation)[levels(listings$occupation) == ""]<- "Other"
+
+str(listings$employment_status_description)
+levels(listings$employment_status_description)
+levels(listings$employment_status_description)[levels(listings$employment_status_description) == "Not employed"] <- "Not-employed"
+
+
+employment <- listings %>%
+    group_by(employment_status_description) %>%
+    summarise(count = n())
+
+plot<-ggplot(data=employment, aes(x=employment_status_description, y=count, fill=employment_status_description))+
+  geom_bar(stat="identity" , position = "dodge")
+plot
+
+```
+
+
+## Data Models
+
+
+
+
