@@ -14,6 +14,7 @@ library(ggplot2)
 library(dplyr)
 library(class)
 library(gmodels)
+library(plotrix)
 
 listings <- read.csv("Listings2013.csv")
 ```
@@ -46,14 +47,19 @@ listings <- listings[complete.cases(listings),]
 
 For predictive purposes we will go ahead and assume that incomplete loans which are paid per schedule will be completed per schedule. Similarly, we will convert loans which are sold off to colleciton agencies as defaulted.
 ```{r}
+listings$originaldate <- listings$loan_origination_date
+listings$originaldate <- as.Date(listings$originaldate, "%m/%d/%Y")
 listings$loan_origination_date <- as.Date(listings$loan_origination_date, "%m/%d/%Y")
 listings$loan_origination_date <- as.numeric(listings$loan_origination_date)
 listings$loan_origination_date <- listings$loan_origination_date-15705
 ```
 
-###Financial Quarters
-We further explore the potential variation in amount of loans and proportion of defaults between financial quarters.
+##Time Analysis
+We look to explore how the the different variables differ over time. 
+###Analysis per Month
+We will start by analysing the potential variation in the amount of loans taken and proportion of defaults among financial quarters.
 ```{r cars}
+#We split up our time variable into the four financial quarters and create a new variable for this data to be saved to.
 Calculatequarters <- function(date) {
   
   if(date <= 90) {
@@ -66,15 +72,17 @@ Calculatequarters <- function(date) {
      return("4")
   }
 }
-
 for(i in 1:NROW(listings$loan_origination_date)){
   listings$quarters[i] <- Calculatequarters(listings$loan_origination_date[i])
 }
-
 listings$quarters <- as.integer(listings$quarters)
 
 ggplot(aes(x=quarters), data=listings) + geom_bar(aes(fill=factor(loan_status)))
+```
+This bar chart is highly interesting, as it seems as if people tend to increasingly take out loans as the year progresses.
 
+Additionally, it seems as if the rate of default is lower as the year progresses, especially in the last financial quarter. To test this hypothesis we will calculate and plot the actual numbers for proportion of default.
+```{r}
 Q1 <- sum(listings$quarters == 1)
 Q1_1 <- sum(listings$quarters == 1 & listings$loan_status==1)
 Q1Ratio <- Q1_1/Q1
@@ -95,8 +103,156 @@ Q4_1 <- sum(listings$quarters == 4 & listings$loan_status==1)
 Q4Ratio <- Q4_1/Q4
 Q4Ratio
 
+DefaultbyQuarter <- c(Q1Ratio, Q2Ratio, Q3Ratio, Q4Ratio)
+plot(DefaultbyQuarter, type="o", col="blue")
+```
+Here it becomes entirely clear to us that the rate of default substantially decreases with each financial quarter. This is a valuable finding which calls for further exploration.
+
+We will proceed by redoing the previous analysis per month. This could potentially show us whether certain months are drivers of the increased amount of loans and decreased default rates.
+```{r}
+Calculatemonths <- function(date2) {
+
+  if(date2 <= 31) {
+    return("1")
+  } else if(date2 <= 59) {
+    return("2")
+  } else if(date2 <= 90) {
+    return("3")
+  } else if(date2 <= 120) {
+    return("4")
+  } else if(date2 <= 151) {
+    return("5")
+  } else if(date2 <= 181) {
+    return("6")
+  } else if(date2 <= 212) {
+    return("7")
+  } else if(date2 <= 243) {
+    return("8")
+  } else if(date2 <= 273) {
+    return("9")
+  } else if(date2 <= 304) {
+    return("10")
+  } else if(date2 <= 334) {
+    return("11")
+  } else {
+     return("12")
+  }
+}
+
+listings$months <- as.integer(listings$months)
+
+for(i in 1:NROW(listings$loan_origination_date)){
+  listings$months[i] <- Calculatemonths(listings$loan_origination_date[i])
+}
+
+ggplot(aes(x=months), data=listings) + geom_bar(aes(fill=factor(loan_status))) + scale_x_discrete(limits=c(1,2,3,4,5,6,7,8,9,10,11,12))
+```
+It appears as if there is near linear growth from January until September, which is quite interesting in itself. Additionally, for November and December there appears to be a non-proportional growth in default rates, which could be an option for arbitrage.
+
+Let's continue by calculating the default rates.
+```{r}
+M1 <- sum(listings$months == 1)
+M1_1 <- sum(listings$months == 1 & listings$loan_status==1)
+M1Ratio <- M1_1/M1
+
+M2 <- sum(listings$months == 2)
+M2_1 <- sum(listings$months == 2 & listings$loan_status==1)
+M2Ratio <- M2_1/M2
+
+M3 <- sum(listings$months == 3)
+M3_1 <- sum(listings$months == 3 & listings$loan_status==1)
+M3Ratio <- M3_1/M3
+
+M4 <- sum(listings$months == 4)
+M4_1 <- sum(listings$months == 4 & listings$loan_status==1)
+M4Ratio <- M4_1/M4
+
+M5 <- sum(listings$months == 5)
+M5_1 <- sum(listings$months == 5 & listings$loan_status==1)
+M5Ratio <- M5_1/M5
+
+M6 <- sum(listings$months == 6)
+M6_1 <- sum(listings$months == 6 & listings$loan_status==1)
+M6Ratio <- M6_1/M6
+
+M7 <- sum(listings$months == 7)
+M7_1 <- sum(listings$months == 7 & listings$loan_status==1)
+M7Ratio <- M7_1/M7
+
+M8 <- sum(listings$months == 8)
+M8_1 <- sum(listings$months == 8 & listings$loan_status==1)
+M8Ratio <- M8_1/M8
+
+M9 <- sum(listings$months == 9)
+M9_1 <- sum(listings$months == 9 & listings$loan_status==1)
+M9Ratio <- M9_1/M9
+
+M10 <- sum(listings$months == 10)
+M10_1 <- sum(listings$months == 10 & listings$loan_status==1)
+M10Ratio <- M10_1/M10
+
+M11 <- sum(listings$months == 11)
+M11_1 <- sum(listings$months == 11 & listings$loan_status==1)
+M11Ratio <- M11_1/M11
+
+M12 <- sum(listings$months == 12)
+M12_1 <- sum(listings$months == 12 & listings$loan_status==1)
+M12Ratio <- M12_1/M12
+
+monthsratio <- c(M1Ratio,M2Ratio,M3Ratio,M4Ratio,M5Ratio,M6Ratio,M7Ratio,M8Ratio,M9Ratio,M10Ratio,M11Ratio,M12Ratio)
+plot(monthsratio, type="o", col="blue")
+```
+As suspected, the default rates of especially November and December are substantially lower than other months.
+
+However, to check whether an investor would be able to find opportunity for arbitrage here, one would need to measure up the rate of default to the interest rate of loans. It could be that the months of November and December are simply filled with ideal loan candidates, demanding low borrowing rates. Let's try to roughly estimate how the two match up over the year.
+```{r}
+#We create a range of months for our future data frame
+monthsvector <- c(1,2,3,4,5,6,7,8,9,10,11,12)
+#We use the tapply function to find the mean borrowing rate for each month.
+monthsrate <- tapply(listings$borrower_rate, listings$months, mean)
+#We recalculate the default ratio to a percentage to match the borrowing rate
+monthsratio <- monthsratio*100
+#Combine to data frame
+dataframe <- data.frame(monthsvector, monthsratio, monthsrate)
+
+#We plot the default rate up against the borrowing rate using a twoord.plot function. This enables us to look at the two line plots simultanously, but with two separate y-axes. 
+twoord.plot(1:12, dataframe$monthsratio, 1:12, dataframe$monthsrate, xlab="Month",
+            ylab="Default Rate",
+            rylab="Borrower Rate",
+            xtickpos = 1:12,
+            xticklab=month.name[1:12])
+```
+It here becomes clear to us that there does not seem to be a significant enough drop in borrowing rate for November and December to divert from investing in November and December. In conclusion, we believe to have found significant arbitrage opportunities for future investing.
+
+###Weekdays
+As our previous analysis proved quite succesful, we will look towards further analysis how time might impact the default rate. This time we will further investigate the difference between weekdays and weekends.
+
+We will start by labelling our date columns the name of each day.
+```{r}
+listings$day <- wday(listings$originaldate, label=TRUE)
+summary(listings$day)
+```
+After splitting up and running a summation command we can see that the data set weirdly enough does not appear to include any Saturdays or Sundays. Upon re-inspecting the initial dataset, we could confirm that this was indeed the case.
+
+We then proceed by comparing the different weekdays to each other. We start by investigating the difference in the rate of default.
+```{r}
+tapply(listings$loan_status, listings$day, mean)
 
 ```
+The results show that there does not seem to be a significant difference in rate of default varying between weekdays.
+
+Let's run it for a few other variables to see if we can find any interesting results.
+```{r}
+tapply(listings$borrower_rate, listings$day, mean)
+tapply(listings$amount_funded, listings$day, mean)
+tapply(listings$income_range, listings$day, mean)
+tapply(listings$income_verifiable, listings$day, mean)
+tapply(listings$monthly_debt, listings$day, mean)
+```
+Disappoingly, there does not seem to be any significant differences between weekdays for these variables. We will thus not conduct further investigatiom into the difference between weekdays.
+
+
+
 
 Scorex is the credit score of the user, it goes from < 600, to 778+. 
 ```{r}
@@ -191,6 +347,19 @@ plot<-ggplot(data=employment, aes(x=employment_status_description, y=count, fill
   geom_bar(stat="identity" , position = "dodge")
 plot
 
+
+listingssample <- listings[sample(nrow(listings), 10),]
+
+listingssample$first_recorded_credit_line <- NULL   
+listingssample$borrower_city <- NULL   
+listingssample$borrower_state <- NULL  
+listingssample$occupation <- NULL 
+listingssample$public_records_last12_months <- NULL 
+listingssample$lender_indicator <- NULL 
+
+
+listingssample$occupation <- as.factor(listingssample$is_homeowner)
+
 ```
 
 
@@ -199,12 +368,12 @@ plot
 # Data Prediction using Logistic Regression
 
 ```{r}
-logit.model <- glm(loan_status ~ ., data = listings, family = "binomial")
+logit.model <- glm(loan_status ~ ., data = listingssample, family = "binomial")
 summary(logit.model)
 
 #Predicting the probability of an employee leaving using the Logit model
 listings_logit <- NULL
-listings_logit$loan_status <- predict(logit.model, newdata = listings, type = "response")
+listings_logit$loan_status <- predict(logit.model, newdata = listingssample, type = "response")
 
 #Converting probabilities to a binary outcome (1 for Prob > 0.5, otherwise 0)
 listings_logit$loan_status[listings_logit$loan_status > 0.5] <- 1
