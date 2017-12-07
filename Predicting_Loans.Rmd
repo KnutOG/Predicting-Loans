@@ -348,7 +348,7 @@ plot<-ggplot(data=employment, aes(x=employment_status_description, y=count, fill
 plot
 
 
-listingssample <- listings[sample(nrow(listings), 10),]
+listingssample <- listings[sample(nrow(listings)),]
 
 listingssample$first_recorded_credit_line <- NULL   
 listingssample$borrower_city <- NULL   
@@ -371,6 +371,8 @@ listingssample$occupation <- as.factor(listingssample$is_homeowner)
 logit.model <- glm(loan_status ~ ., data = listingssample, family = "binomial")
 summary(logit.model)
 
+logit.model1 <- glm(loan_status ~ amount_funded, borrower_rate, listing_term, scorex620-639, scorex640-649, scorex650-669, scorex665-689, scorex690-701, scorex702-723, scorex724-747, scorex748-777, scorex<600, stated_monthly_income, employment_status_descriptionOther, monthly_debt, inquiries_last6_months, bankcard_utilization, total_open_revolving_accounts, installment_balance, revolving_available_percent, total_inquiries, delinquencies_over30_days, delinquencies_over60_days, is_homeownerTRUE, data = listingssample, family = "binomial")
+
 #Predicting the probability of an employee leaving using the Logit model
 listings_logit <- NULL
 listings_logit$loan_status <- predict(logit.model, newdata = listingssample, type = "response")
@@ -380,7 +382,7 @@ listings_logit$loan_status[listings_logit$loan_status > 0.5] <- 1
 listings_logit$loan_status[listings_logit$loan_status != 1] <- 0
 
 #Creating a cross table to verify the accuracy of the Logit model
-CrossTable(x = listings_logit$loan_status, y = listings[26834:33542, 11], prop.chisq = FALSE)
+#CrossTable(x = listings_logit$loan_status, y = listings[26834:33542, 11], prop.chisq = FALSE)
 ```
 
 # Getting Data Ready for Machine Learning Models
@@ -409,11 +411,11 @@ listings_test_label <- listings_random[26834:33542, 3]
 
 ```{r}
 #listings_predict <- knn(train = listings_train, test = listings_test,
-                      cl = listings_train_label, k = 183) 
+                     # cl = listings_train_label, k = 183) 
                       # k = sqrt(population size: 33542) = 183 
 # confusion matrix
 #CrossTable(x = listings_test_label, y = listings_predict, 
-           prop.chisq=FALSE)
+           #prop.chisq=FALSE)
 ```
 
 
