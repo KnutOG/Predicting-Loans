@@ -256,7 +256,7 @@ Disappoingly, there does not seem to be any significant differences between week
 
 Scorex is the credit score of the user, it goes from < 600, to 778+. 
 ```{r}
-
+ 
 scorex <- listings %>%
     group_by(scorex) %>%
     summarise(count = n())
@@ -264,6 +264,12 @@ scorex <- listings %>%
 plot<-ggplot(data=scorex, aes(x=scorex, y=count, fill =scorex))+
   geom_bar(stat="identity" , position = "dodge")
 plot
+
+
+levels(listings$scorex) <- c(600,610,630,645,660,675,695,711,735.5,762, 778)
+
+listings$scorex <- as.numeric(as.character(listings$scorex))
+
 ```
  
 Prosper Score is a score from 1-11 with 1 being lowest risk. Because this is a score that we did not create we don't know what went into it. In addition the data they are using is probably the same data we are using so it does not provide any novel new information to the model. Lets remove it.
@@ -322,6 +328,10 @@ loanInBetween <- listings %>%
     summarise(count = n())
 
 
+listings$dti_wprosper_loan[listings$dti_wprosper_loan == 1000000.00] <- NA
+
+listings$dti_wprosper_loan[is.na(listings$dti_wprosper_loan)] = median(listings$dti_wprosper_loan, na.rm=TRUE)
+
 
 ```
 TO DO: Why does this have to be a value less than 1?
@@ -359,6 +369,12 @@ listingssample$lender_indicator <- NULL
 
 
 listingssample$occupation <- as.factor(listingssample$is_homeowner)
+
+
+listings$months_employed[listings$months_employed <0] <- NA
+
+listings$months_employed[is.na(listings$months_employed)] = median(listings$months_employed, na.rm=TRUE)
+
 
 ```
 
