@@ -368,7 +368,7 @@ listingssample$public_records_last12_months <- NULL
 listingssample$lender_indicator <- NULL 
 
 
-listingssample$occupation <- as.factor(listingssample$is_homeowner)
+listingssample$is_homeowner <- as.factor(listingssample$is_homeowner)
 
 
 listings$months_employed[listings$months_employed <0] <- NA
@@ -506,8 +506,12 @@ plot
 After separating the cities into two groups, either in the top 500 gpd producing metro's or not major, we find little correlation.
 
 ```{r}
-listingssample$borrower_city <- NULL   
-listingssample$borrower_state <- NULL
+#drop high factor level
+#listingssample$borrower_city <- NULL   
+#listingssample$borrower_state <- NULL
+listingsample<- listings[, !(colnames(listings) %in% c("State", "region", "originaldate", "first_recorded_credit_line", "borrower_city", "borrower_state", "occupation", "public_records_last12_months"))]
+
+
 ```
 
 
@@ -517,7 +521,7 @@ listingssample$borrower_state <- NULL
 
 # Data Prediction using Logistic Regression
 
-```{r}
+#```{r}
 logit.model <- glm(loan_status ~ ., data = listingssample, family = "binomial")
 summary(logit.model)
 
@@ -533,14 +537,60 @@ listings_logit$loan_status[listings_logit$loan_status != 1] <- 0
 
 #Creating a cross table to verify the accuracy of the Logit model
 #CrossTable(x = listings_logit$loan_status, y = listings[26834:33542, 11], prop.chisq = FALSE)
-```
+#```
 
 # Getting Data Ready for Machine Learning Models
 
+
+```{r}
+levels(listingsample$employment_status_description) <- c("employed", "Fulltime", "NotEmployed", "other", "parttime", "retired", "selfEmployed" )
+```
+
 ```{r}
 # Randomizing  dataset
-listings_random <- listings[sample(nrow(listings)),]
+set.seed(12345)
 
+listing_rand <- listingsample[order(runif(33300)),]
+listing_rand$loan_status <- as.factor(listing_rand$loan_status)
+listings_labels <- listing_rand[1]
+
+l_dummy <-model.matrix(~ . -1, data = listing_rand[-1])
+l_dummy <- as.data.frame(scale(l_dummy))
+l_dummy$loan_status <- listings_labels$loan_status
+
+
+#library(plyr)
+#l_dummy<- rename(l_dummy, c("beta"="two", "gamma"="three"))
+names(l_dummy)[names(l_dummy)=="scorex< 600"] <- "scorexLess"
+names(l_dummy)[names(l_dummy)=="scorex600-619"] <- "sx619"
+names(l_dummy)[names(l_dummy)=="scorex620-639"] <- "sx639"
+names(l_dummy)[names(l_dummy)=="scorex640-649"] <- "sx649"
+names(l_dummy)[names(l_dummy)=="scorex650-664"] <- "sx664"
+names(l_dummy)[names(l_dummy)=="scorex665-689"] <- "sx689"
+names(l_dummy)[names(l_dummy)=="scorex690-701"] <- "sx701"
+names(l_dummy)[names(l_dummy)=="scorex702-723"] <- "sx723"
+names(l_dummy)[names(l_dummy)=="scorex724-747"] <- "sx747"
+names(l_dummy)[names(l_dummy)=="scorex748-777"] <- "sx777"
+names(l_dummy)[names(l_dummy)=="scorex778+"] <- "sx778"
+
+names(l_dummy)[names(l_dummy)=="day^4"] <- "day4"
+names(l_dummy)[names(l_dummy)=="day^5"] <- "day5"
+names(l_dummy)[names(l_dummy)=="day^6"] <- "day6"
+names(l_dummy)[names(l_dummy)=="top_ten_gdpNot Major"] <- "nogdp"
+
+train_data_indicies <- sample(1:nrow(l_dummy), 
+                              replace = F, 
+                              size = floor(nrow(l_dummy) * 0.75)) 
+                  
+train_data <- l_dummy[train_data_indicies, ]
+test_data <- l_dummy[-train_data_indicies, ]
+#listings_random <- listings[sample(nrow(listings)),]
+
+round(prop.table(table(train_data$loan_status)) * 100, 1)
+
+round(prop.table(table(test_data$loan_status)) * 100, 1)
+
+```
 # Rescaling listings dataset using Min-Max Normalization
 normalize <- function(x) {
   return ((x - min(x)) / (max(x) - min(x)))
@@ -555,18 +605,83 @@ listings_train_label <- listings_random[1:26833, 3]
 listings_test <- listings_n[26834:33542, 1:10]
 listings_test_label <- listings_random[26834:33542, 3]
 
-```
+
+
+listing_formula <- colnames(train_data) %>% 
+    {paste(.[! . %in% "loan_status"], collapse = " + ")} %>% 
+    paste("loan_status ~ ", .) %>% 
+    as.formula()
+
+
+
+
+
+
+
 
 # Data Prediction using kNN
 
 ```{r}
-#listings_predict <- knn(train = listings_train, test = listings_test,
-                     # cl = listings_train_label, k = 183) 
+library(class)
+library(gmodels)
+knn_listing_pred <- knn(train = train_data, test = test_data,
+                      cl = train_data$loan_status, k = 183) 
                       # k = sqrt(population size: 33542) = 183 
 # confusion matrix
-#CrossTable(x = listings_test_label, y = listings_predict, 
-           #prop.chisq=FALSE)
+CrossTable(test_data$loan_status, knn_listing_pred,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('Actual Loan Status', 'Predicted Loan Status'))
+
+
+a2 = accuracy(knn_listing_pred, test_data$loan_status, "KNN ", TRUE)
+
 ```
 
+
+#accuracy function
+
+```{r}
+accuracy <- function(predicted, trueval, model, hideoutput = F) {
+  stopifnot(length(predicted) == length(trueval))
+  result <- sum(predicted == trueval) / length(predicted)
+  if (!hideoutput) {cat("Model:", model, "had", result, "accuracy\n")}
+  return(result)
+}
+```
+
+
+#Decision Tree
+
+```{r}
+library(C50)
+default_decision_tree <- C5.0(train_data[-73], train_data$loan_status, trials = 3)
+
+default_decision_tree
+
+summary(default_decision_tree)
+
+##Evaluating model performance ----
+default_decision_pred <- predict(default_decision_tree, test_data)
+
+# cross tabulation of predicted versus actual classes
+
+CrossTable(test_data$loan_status, default_decision_pred,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('Actual Loan Status', 'Predicted Loan Status'))
+
+ 
+#Kappa(table(cancer_decision_pred, test_data$diagnosis))
+
+a1= accuracy(default_decision_pred, test_data$loan_status, "C5.0 Decision Tree", TRUE)
+```
+
+
+random forest
+```{r}
+library(randomForest)
+rf <- randomForest(loan_status ~ ., data = train_data)
+rf_pred <- predict(rf, test_data)
+a7 = accuracy(rf_pred, test_data$left, "Random Forest", TRUE)
+```
 
 
