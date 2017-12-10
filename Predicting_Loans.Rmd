@@ -358,14 +358,9 @@ plot<-ggplot(data=employment, aes(x=employment_status_description, y=count, fill
 plot
 
 
-listingssample <- listings[sample(nrow(listings)),]
+#listingssample <- listings[sample(nrow(listings)),]
 
-listingssample$first_recorded_credit_line <- NULL   
-#listingssample$borrower_city <- NULL   
-#listingssample$borrower_state <- NULL  
-listingssample$occupation <- NULL 
-listingssample$public_records_last12_months <- NULL 
-listingssample$lender_indicator <- NULL 
+
 
 
 listingssample$is_homeowner <- as.factor(listingssample$is_homeowner)
@@ -494,7 +489,7 @@ library(tidyr)
 citi <- citi%>%mutate(City=strsplit(as.character(City),'-'))%>%unnest(City)
 citi<-citi[!(citi$City==""),]
 listings$is_major_gdp <- ifelse(listings$borrower_city %in% citi$City, "Major", "Not Major")
-
+listings$is_major_gdp  <- as.factor(listings$is_major_gdp )
 defaultByGDP<- listings %>%
     group_by(is_major_gdp) %>%
     summarise(sum = n(), prop = sum(loan_status == 1)/n())
@@ -505,14 +500,25 @@ plot
 ```
 After separating the cities into two groups, either in the top 500 gpd producing metro's or not major, we find little correlation.
 
+
+
+Aggregate Variable
+```{r}
+listings$delinq_agg <- listings$delinquencies_over30_days + 2*listings$delinquencies_over60_days + 4*listings$delinquencies_over90_days
+```
+
+
 ```{r}
 #drop high factor level
 #listingssample$borrower_city <- NULL   
 #listingssample$borrower_state <- NULL
-listingsample<- listings[, !(colnames(listings) %in% c("State", "region", "originaldate", "first_recorded_credit_line", "borrower_city", "borrower_state", "occupation", "public_records_last12_months"))]
 
-
+listingsample<- listings[, !(colnames(listings) %in% c("State", "region", "originaldate", "first_recorded_credit_line", "borrower_city", "borrower_state", "occupation", "public_records_last12_months", "Rank", "delinquencies_over30_days", "delinquencies_over90_days", "delinquencies_over60_days", "borrower_rate", "lender_indicator"))]
+listingsample$months <- as.factor(listingsample$months)
 ```
+
+
+
 
 
 
@@ -521,23 +527,12 @@ listingsample<- listings[, !(colnames(listings) %in% c("State", "region", "origi
 
 # Data Prediction using Logistic Regression
 
-#```{r}
-logit.model <- glm(loan_status ~ ., data = listingssample, family = "binomial")
-summary(logit.model)
+```{r}
+logReg <- glm(loan_status ~ ., data = listingsample, family = "binomial")
+str(listingsample)
+summary(logReg)
+```
 
-logit.model1 <- glm(loan_status ~ amount_funded, borrower_rate, listing_term, scorex620-639, scorex640-649, scorex650-669, scorex665-689, scorex690-701, scorex702-723, scorex724-747, scorex748-777, scorex<600, stated_monthly_income, employment_status_descriptionOther, monthly_debt, inquiries_last6_months, bankcard_utilization, total_open_revolving_accounts, installment_balance, revolving_available_percent, total_inquiries, delinquencies_over30_days, delinquencies_over60_days, is_homeownerTRUE, data = listingssample, family = "binomial")
-
-#Predicting the probability of an employee leaving using the Logit model
-listings_logit <- NULL
-listings_logit$loan_status <- predict(logit.model, newdata = listingssample, type = "response")
-
-#Converting probabilities to a binary outcome (1 for Prob > 0.5, otherwise 0)
-listings_logit$loan_status[listings_logit$loan_status > 0.5] <- 1
-listings_logit$loan_status[listings_logit$loan_status != 1] <- 0
-
-#Creating a cross table to verify the accuracy of the Logit model
-#CrossTable(x = listings_logit$loan_status, y = listings[26834:33542, 11], prop.chisq = FALSE)
-#```
 
 # Getting Data Ready for Machine Learning Models
 
@@ -552,11 +547,11 @@ set.seed(12345)
 
 listing_rand <- listingsample[order(runif(33300)),]
 listing_rand$loan_status <- as.factor(listing_rand$loan_status)
-listings_labels <- listing_rand[1]
+loan_status <- listing_rand[1]
 
 l_dummy <-model.matrix(~ . -1, data = listing_rand[-1])
 l_dummy <- as.data.frame(scale(l_dummy))
-l_dummy$loan_status <- listings_labels$loan_status
+l_dummy<- cbind(loan_status, l_dummy)
 
 
 #library(plyr)
@@ -580,7 +575,7 @@ names(l_dummy)[names(l_dummy)=="top_ten_gdpNot Major"] <- "nogdp"
 
 train_data_indicies <- sample(1:nrow(l_dummy), 
                               replace = F, 
-                              size = floor(nrow(l_dummy) * 0.75)) 
+                              size = floor(nrow(l_dummy) * 0.8)) 
                   
 train_data <- l_dummy[train_data_indicies, ]
 test_data <- l_dummy[-train_data_indicies, ]
@@ -590,33 +585,32 @@ round(prop.table(table(train_data$loan_status)) * 100, 1)
 
 round(prop.table(table(test_data$loan_status)) * 100, 1)
 
+
+#listing_formula <- colnames(train_data) %>% 
+#    {paste(.[! . %in% "loan_status"], collapse = " + ")} %>% 
+#    paste("loan_status ~ ", .) %>% 
+#    as.formula()
+
 ```
-# Rescaling listings dataset using Min-Max Normalization
-normalize <- function(x) {
-  return ((x - min(x)) / (max(x) - min(x)))
-  }
-listings_n <- as.data.frame(lapply(listings_random[31:40], normalize))
-str(listings_n)
-
-# Subsetting listings dataset with 33542 enteries into test and train subsets, where 80% entries (26,833) are test and 20% entries (6,709) are train
-listings_train <- listings_n[1:26833, 1:10]
-listings_train_label <- listings_random[1:26833, 3]
-
-listings_test <- listings_n[26834:33542, 1:10]
-listings_test_label <- listings_random[26834:33542, 3]
-
-
-
-listing_formula <- colnames(train_data) %>% 
-    {paste(.[! . %in% "loan_status"], collapse = " + ")} %>% 
-    paste("loan_status ~ ", .) %>% 
-    as.formula()
 
 
 
 
 
 
+
+
+
+#accuracy function
+
+```{r}
+accuracy <- function(predicted, trueval, model, hideoutput = F) {
+  stopifnot(length(predicted) == length(trueval))
+  result <- sum(predicted == trueval) / length(predicted)
+  if (!hideoutput) {cat("Model:", model, "had", result, "accuracy\n")}
+  return(result)
+}
+```
 
 
 # Data Prediction using kNN
@@ -638,23 +632,13 @@ a2 = accuracy(knn_listing_pred, test_data$loan_status, "KNN ", TRUE)
 ```
 
 
-#accuracy function
-
-```{r}
-accuracy <- function(predicted, trueval, model, hideoutput = F) {
-  stopifnot(length(predicted) == length(trueval))
-  result <- sum(predicted == trueval) / length(predicted)
-  if (!hideoutput) {cat("Model:", model, "had", result, "accuracy\n")}
-  return(result)
-}
-```
 
 
 #Decision Tree
 
 ```{r}
 library(C50)
-default_decision_tree <- C5.0(train_data[-73], train_data$loan_status, trials = 3)
+default_decision_tree <- C5.0(train_data[-1], train_data$loan_status, trials = 3)
 
 default_decision_tree
 
@@ -674,14 +658,90 @@ CrossTable(test_data$loan_status, default_decision_pred,
 
 a1= accuracy(default_decision_pred, test_data$loan_status, "C5.0 Decision Tree", TRUE)
 ```
+### Improving Decision Trees: Boosting and Cost Matrix
 
+Lets attempt to improve your decision tree model by adding Adaptive Boosting for 10 trials.
 
-random forest
 ```{r}
-library(randomForest)
-rf <- randomForest(loan_status ~ ., data = train_data)
-rf_pred <- predict(rf, test_data)
-a7 = accuracy(rf_pred, test_data$left, "Random Forest", TRUE)
+# creating a decision tree prediction model using 10 trials
+Decision_Tree_Model_Bagged <- C5.0(train_data[-1], train_data$loan_status, trials = 10)
+
+# create a factor vector of predictions on test data
+Decision_Tree_Predict_Bagged <- predict(Decision_Tree_Model_Bagged, train_data)
+
+# creating a proportion table to check model accuacy
+prop.table(table(Decision_Tree_Predict_Bagged == train_data$loan_status))
+
+# cross tabulation of predicted v/s actual classes
+CrossTable(test_data$loan_status, Decision_Tree_Predict_Bagged,
+           dnn = c('actual loan_status', 'predicted loan_status'))
 ```
+
+Lets attempt to improve your model with a cost matrix.
+
+```{r}
+# cost matrix
+Decision_Tree_Error_Cost_Matrix <- matrix(c(0, 1, 4, 0), nrow = 2)
+
+# create model - apply the cost matrix to the tree
+Decision_Tree_Error_Cost_Model <- C5.0(train_data[-1], 
+                                       train_data$loan_status,
+                                       costs = Decision_Tree_Error_Cost_Matrix)
+
+# predict - using model and test data set
+Decision_Tree_Error_Cost_Prediction <- predict(Decision_Tree_Error_Cost_Model, test_data)
+
+
+# creating a proportion table to check model accuacy
+prop.table(table(Decision_Tree_Error_Cost_Prediction == train_data$loan_status))
+# cross tabulation of predicted v/s actual classes
+CrossTable(test_data$loan_status, Decision_Tree_Error_Cost_Prediction, 
+           dnn = c('actual loan_status', 'predicted loan_status'))
+```
+### Cross Validation
+
+run a 10-fold cross validation in an attempt to improve the model -
+
+```{r}
+# randomizing the data set
+set.seed(12345)
+folds <- createFolds(train_data$loan_status, k = 10)
+
+folding_results <- lapply(folds, function(x) {
+  fold_train <- train_data[x, ]
+  fold_test <- test_data[-x, ]
+  fold_model  <- C5.0(loan_status ~ ., data = fold_train)
+  prediction <- predict(fold_model, fold_test)
+  actual <- fold_test$loan_status
+  kappa <- kappa2(data.frame(actual, prediction))$value
+  return(kappa)
+})
+
+str(folding_results)
+mean(unlist(folding_results))
+```
+
+
+# Data Prediction using Neural Nets
+
+```{r}
+library(neuralnet)
+# confirm that the range is now between zero and one
+train_data$loan_status <- as.numeric(train_data$loan_status)
+
+# ANN w/ hidden neuron = 1
+neuralNet_model <- neuralnet(formula = loan_status ~ scorex  + listing_category_id, data = train_data, hidden = 1)
+
+# visualize the network topology
+plot(neuralNet_model)
+
+# compute predicted values using test data and neuralNet_model
+neuralNet_results <- compute(neuralNet_model, train_data[-1])
+predicted <- neuralNet_results$net.result
+
+# examine the correlation between predicted and actual values
+cor(predicted, test_data$loan_status)
+```
+
 
 
