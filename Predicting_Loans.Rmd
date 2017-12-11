@@ -15,18 +15,21 @@ library(dplyr)
 library(class)
 library(gmodels)
 library(plotrix)
+library(C50)
+library(irr)
+ library(vcd)
 
 listings <- read.csv("Listings2013.csv")
 ```
 
 ## Data Cleaning
 As part of our exploration of our dataset, we find several variables to be irrelevant to further analysis. The variables deleted are found irrelevant as they are aggregate variables or identical variables.
-```{r}
+```{r, echo = FALSE}
 
-sapply(data, function(x) sum(is.na(x)))
+sapply(listings, function(x) sum(is.na(x)))
 
 
-
+#remove because ***
 listings$number_of_days <- NULL
 listings$principal_balance <- NULL
 listings$loan_status_description <- NULL
@@ -44,6 +47,16 @@ listings <- listings[complete.cases(listings),]
 
 
 ```
+
+Exploration:
+```{r}
+qplot(x = amount_funded, data = listings,
+      binwidth = 1000, colour = I("#424242"), fill = I("#0077C0")) +
+  scale_x_continuous(breaks = seq(0, 35000, 5000))
+```
+Here we plot the count for each amount funded. We find that the majority of the people are looking for smaller loans, and it trails out towards the upper limits of ~35,000. Another interesting thing to note is the spikes at each interval of 5000.
+
+
 
 For predictive purposes we will go ahead and assume that incomplete loans which are paid per schedule will be completed per schedule. Similarly, we will convert loans which are sold off to colleciton agencies as defaulted.
 ```{r}
@@ -285,6 +298,17 @@ listings category ID is a category of the Loan but there is no description to go
 Income range, Income Range Description, Stated Monthly Income. We don't want this datapoint to be overrepresented in the model. Therefore we only need one of these variables. Lets go with Stated Monthly Income since it is more granular than the broad income range. 
 TO DO: Some of the algorithms will find that they are highly correlated and won't "Count them as double"... which ones?
 ```{r}
+qplot(x = income_range_description, data = listings, fill = I("#0077C0")) +
+  scale_x_discrete(limits = c("Not employed", "$0", "$1-24,999", "$25,000-49,999", "$50,000-74,999", "$75,000-99,999", "$100,000+", "Not displayed"))
+```
+Here we plot the distribution of the income ranges for the borrowers. We find that it does not necessarily follow a normal distribution, with the majority of the borrows have less than 75,000.
+
+```{r}
+
+#??? why?
+
+
+
 listings$income_range   <- NULL
 listings$income_range_description  <- NULL
 
@@ -361,9 +385,10 @@ plot
 #listingssample <- listings[sample(nrow(listings)),]
 
 
+```
 
-
-listingssample$is_homeowner <- as.factor(listingssample$is_homeowner)
+```{r}
+#listingsample$is_homeowner <- as.factor(listingssample$is_homeowner)
 
 
 listings$months_employed[listings$months_employed <0] <- NA
@@ -450,9 +475,34 @@ p <- ggplot(listingsByStates, aes(map_id = region)) +
   ggtitle("States By Probability of Listings Default")
 
 p + fifty_states_inset_boxes() 
-```
-A look at the probability of default by states.
 
+```
+A look at the probability of default by states. We find that **
+
+```{r}
+StatesCount<- listings %>%
+     group_by(region) %>%
+      summarise(count = n())
+
+  
+map2 <- merge(states, StatesCount, by="region", all.x=F)
+
+stateByCount <- ggplot(StatesCount, aes(map_id = region)) + 
+  # map points to the fifty_states shape data
+  geom_map(aes(fill = count), map = fifty_states) + 
+  scale_fill_gradient(low = "yellow", high = "red") +
+  expand_limits(x = fifty_states$long, y = fifty_states$lat) +
+  coord_map() +
+  scale_x_continuous(breaks = NULL) + 
+  scale_y_continuous(breaks = NULL) +
+  labs(x = "", y = "") +
+  theme(legend.position = "bottom", 
+        panel.background = element_blank()) +
+  ggtitle("States By Probability of Listings Default")
+
+stateByCount + fifty_states_inset_boxes() 
+```
+We find that california is the most popular state, followed by texas and new york. This makes sense since they are the biggest states.
 
 ## Cost of Living By State
 ```{r}
@@ -465,13 +515,96 @@ A look at the probability of default by states.
   
   defaultByStateCOL <-listings %>%
       group_by(Rank) %>%
-      summarise(sum = n(), prop = sum(loan_status == "Default")/n())
+      summarise(sum = n(), prop = sum(loan_status == 1)/n())
   
   plot<-ggplot(data=defaultByStateCOL, aes(x=Rank, y=prop, fill = (Rank)))+
     geom_bar(stat="identity" ) + geom_smooth()
   plot 
 
 ```
+As the Cost of Living for each state rank goes up (less costly), likely hood of default goes down.
+
+```{r}
+
+
+listingsByRates<- listings %>%
+     group_by(borrower_rate) %>%
+    summarise(sum = n(), prop = sum(loan_status == 1)/n())
+
+plot<-ggplot(data=listingsByRates, aes(x=borrower_rate, y=prop, fill = (borrower_rate)))+
+  geom_bar(stat="identity" )+ geom_smooth()
+plot 
+
+
+
+
+listingsByScorex<- listings %>%
+   group_by(scorex) %>%
+    summarise(sum = n(), prop = sum(loan_status == 1)/n())
+
+
+
+
+plot<-ggplot(data=listingsByScorex, aes(x=scorex, y=prop, fill = (scorex)))+
+  geom_bar(stat="identity" )
+plot 
+
+
+listingByIncomeRangeDesc <-listings %>%
+    group_by(income_range_description) %>%
+    summarise(sum = n(), prop = sum(loan_status == 1)/n())
+
+
+
+
+plot<-ggplot(data=listingByIncomeRangeDesc, aes(x=income_range_description, y=prop, fill = (income_range_description)))+
+  geom_bar(stat="identity" )
+plot 
+
+
+listingByIncomeRange <-listings %>%
+    group_by(income_range) %>%
+    summarise(sum = n(), prop = sum(loan_status == 1)/n())
+
+
+
+plot<-ggplot(data=listingByIncomeRange, aes(x=income_range, y=prop, fill = (income_range)))+
+  geom_bar(stat="identity" )
+plot 
+
+
+lByVerified <-listings %>%
+    group_by(income_verifiable) %>%
+    summarise(sum = n(), prop = sum(loan_status == 1)/n())
+
+
+
+plot<-ggplot(data=lByVerified, aes(x=income_verifiable, y=prop, fill = (income_verifiable)))+
+  geom_bar(stat="identity" )
+plot 
+
+
+
+
+lByListingTime <-listings %>%
+    group_by(listing_term) %>%
+    summarise(sum = n(), prop = sum(loan_status == 1)/n())
+
+
+
+plot<-ggplot(data=lByListingTime, aes(x=listing_term, y=prop, fill = (listing_term)))+
+  geom_bar(stat="identity" )
+plot 
+
+```
+Scorex: As the scorex increases, the likelihood of defaulting decreases. 
+Income Range: As the scorex increases, the likelihood of defaulting decreases. **
+Income Verifiable: Income without being verified are less likely of being defaulted. This is somewhat different than what we expected
+By listing term: The longer the listing term, the more likely a borrower is to default.
+
+
+
+
 
 
 ## Top 500 cities by GPD
@@ -514,7 +647,13 @@ listings$delinq_agg <- listings$delinquencies_over30_days + 2*listings$delinquen
 #listingssample$borrower_state <- NULL
 
 listingsample<- listings[, !(colnames(listings) %in% c("State", "region", "originaldate", "first_recorded_credit_line", "borrower_city", "borrower_state", "occupation", "public_records_last12_months", "Rank", "delinquencies_over30_days", "delinquencies_over90_days", "delinquencies_over60_days", "borrower_rate", "lender_indicator"))]
+
+#drop aggregates
+listingsample<- listingsample[, !(colnames(listingsample) %in% c("scorex", "dti_wprosper_loan"))]
+
 listingsample$months <- as.factor(listingsample$months)
+levels(listingsample$employment_status_description) <- c("employed", "Fulltime", "NotEmployed", "other", "parttime", "retired", "selfEmployed" )
+
 ```
 
 
@@ -536,16 +675,30 @@ summary(logReg)
 
 # Getting Data Ready for Machine Learning Models
 
+Since our dataset is relatively small ~33,300 after cleaning and the proportion of our predictor variable is low ~13%, we refine our dataset to have a more equal distribution of the two outcomes. This will help prevent overfitting or poor classification results. From our datset, about 4292 default and 29008 do not default. 
+```{r}
+default_listings <- listingsample[listingsample$loan_status == 1, ]
+no_default_listings <- listingsample[listingsample$loan_status == 0, ]
+
+index <- sample(1:nrow(no_default_listings), 8600)
+
+
+no_default_listings_sample <- no_default_listings[index, ]
+
+listingsample <- rbind(no_default_listings_sample, default_listings)
+
+```
+
 
 ```{r}
-levels(listingsample$employment_status_description) <- c("employed", "Fulltime", "NotEmployed", "other", "parttime", "retired", "selfEmployed" )
+
 ```
 
 ```{r}
 # Randomizing  dataset
 set.seed(12345)
 
-listing_rand <- listingsample[order(runif(33300)),]
+listing_rand <- listingsample[order(runif(12892)),]
 listing_rand$loan_status <- as.factor(listing_rand$loan_status)
 loan_status <- listing_rand[1]
 
@@ -619,15 +772,16 @@ accuracy <- function(predicted, trueval, model, hideoutput = F) {
 library(class)
 library(gmodels)
 knn_listing_pred <- knn(train = train_data, test = test_data,
-                      cl = train_data$loan_status, k = 183) 
+                      cl = train_data$loan_status, k = 20) 
                       # k = sqrt(population size: 33542) = 183 
 # confusion matrix
 CrossTable(test_data$loan_status, knn_listing_pred,
            prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
            dnn = c('Actual Loan Status', 'Predicted Loan Status'))
 
+Kappa(table(knn_listing_pred, test_data$loan_status))
 
-a2 = accuracy(knn_listing_pred, test_data$loan_status, "KNN ", TRUE)
+a1 = accuracy(knn_listing_pred, test_data$loan_status, "KNN with k = 20", TRUE)
 
 ```
 
@@ -637,7 +791,7 @@ a2 = accuracy(knn_listing_pred, test_data$loan_status, "KNN ", TRUE)
 #Decision Tree
 
 ```{r}
-library(C50)
+
 default_decision_tree <- C5.0(train_data[-1], train_data$loan_status, trials = 3)
 
 default_decision_tree
@@ -654,9 +808,10 @@ CrossTable(test_data$loan_status, default_decision_pred,
            dnn = c('Actual Loan Status', 'Predicted Loan Status'))
 
  
-#Kappa(table(cancer_decision_pred, test_data$diagnosis))
 
-a1= accuracy(default_decision_pred, test_data$loan_status, "C5.0 Decision Tree", TRUE)
+Kappa(table(default_decision_pred, test_data$loan_status))
+
+a2= accuracy(default_decision_pred, test_data$loan_status, "C5.0 Decision Tree", TRUE)
 ```
 ### Improving Decision Trees: Boosting and Cost Matrix
 
@@ -667,14 +822,20 @@ Lets attempt to improve your decision tree model by adding Adaptive Boosting for
 Decision_Tree_Model_Bagged <- C5.0(train_data[-1], train_data$loan_status, trials = 10)
 
 # create a factor vector of predictions on test data
-Decision_Tree_Predict_Bagged <- predict(Decision_Tree_Model_Bagged, train_data)
+Decision_Tree_Predict_Bagged <- predict(Decision_Tree_Model_Bagged, test_data)
 
 # creating a proportion table to check model accuacy
 prop.table(table(Decision_Tree_Predict_Bagged == train_data$loan_status))
 
 # cross tabulation of predicted v/s actual classes
 CrossTable(test_data$loan_status, Decision_Tree_Predict_Bagged,
-           dnn = c('actual loan_status', 'predicted loan_status'))
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('Actual Loan Status', 'Predicted Loan Status'))
+
+Kappa(table(Decision_Tree_Predict_Bagged, test_data$loan_status))
+
+a3= accuracy(default_decision_pred, test_data$loan_status, "C5.0 Decision Tree with 10 trials", TRUE)
+
 ```
 
 Lets attempt to improve your model with a cost matrix.
@@ -697,6 +858,9 @@ prop.table(table(Decision_Tree_Error_Cost_Prediction == train_data$loan_status))
 # cross tabulation of predicted v/s actual classes
 CrossTable(test_data$loan_status, Decision_Tree_Error_Cost_Prediction, 
            dnn = c('actual loan_status', 'predicted loan_status'))
+
+a4= accuracy(Decision_Tree_Error_Cost_Prediction, test_data$loan_status, "C5.0 Decision Tree with cost matrix", TRUE)
+
 ```
 ### Cross Validation
 
@@ -736,12 +900,42 @@ neuralNet_model <- neuralnet(formula = loan_status ~ scorex  + listing_category_
 plot(neuralNet_model)
 
 # compute predicted values using test data and neuralNet_model
-neuralNet_results <- compute(neuralNet_model, train_data[-1])
+neuralNet_results <- compute(neuralNet_model, test_data[-1])
 predicted <- neuralNet_results$net.result
 
 # examine the correlation between predicted and actual values
 cor(predicted, test_data$loan_status)
 ```
+Random Forest:
 
+```{r}
+library(randomForest)
+rf <- randomForest(loan_status ~ ., data = train_data)
+rf_pred <- predict(rf, test_data)
+a7 = accuracy(rf_pred, test_data$loan_status, "Random Forest", TRUE)
+Kappa(table(rf_pred, test_data$loan_status))
+
+```
+
+
+Stacked Model
+```{r}
+
+```
+
+```{r}
+acc_predictions = c(a1,a2,a3,a4)
+#acc_predictions = c(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10)
+#names = c("Log Prediction Plain","Log Boosted","Log Step","SVM with Vanilla Kernal","SVM Radial Basis Kernal","Neural Net One Hidden Node","Neural Net Two Hidden Nodes","CTree Regression","Random Forest Classification","Ada Boost Classification")
+
+names = c("Knn","Decision C5.0 Tree Regression","Decision Tree C5.0 Regression trails 10", "Decision Tree C5.0 with Cost Model", "Random Forest", "Stacked Model")
+
+acc_mat <- data.frame(ModelName = names, accuracy = acc_predictions) %>% print
+```
+
+```{r}
+dotchart(acc_predictions, labels = names, main = "Accuracy of the models", xlab = "Accuracy")
+
+```
 
 
