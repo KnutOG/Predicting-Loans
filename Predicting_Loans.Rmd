@@ -7,38 +7,36 @@ output: html_document
 
 
 ## Libraries and Data Setup 
-```{r}
-library(lubridate)
-library(gmodels)
-library(ggplot2)
-library(dplyr)
-library(class)
-library(gmodels)
-library(plotrix)
-library(C50)
-library(irr)
- library(vcd)
+```{r import, echo = FALSE}
+suppressPackageStartupMessages(require(lubridate))
+suppressPackageStartupMessages(require(gmodels))
+suppressPackageStartupMessages(require(ggplot2))
+suppressPackageStartupMessages(require(dplyr))
+suppressPackageStartupMessages(require(class))
+suppressPackageStartupMessages(require(gmodels))
+suppressPackageStartupMessages(require(plotrix))
+suppressPackageStartupMessages(require(C50))
+suppressPackageStartupMessages(require(irr))
+suppressPackageStartupMessages(require(vcd))
+suppressPackageStartupMessages(require(randomForest))
+suppressPackageStartupMessages(require(fiftystater))
+suppressPackageStartupMessages(require(tidyr))
+suppressPackageStartupMessages(require(class))
+suppressPackageStartupMessages(require(gmodels))
+suppressPackageStartupMessages(require(neuralnet))
 
 listings <- read.csv("Listings2013.csv")
 ```
 
 ## Data Cleaning
 As part of our exploration of our dataset, we find several variables to be irrelevant to further analysis. The variables deleted are found irrelevant as they are aggregate variables or identical variables.
-```{r, echo = FALSE}
-
+```{r, include = FALSE}
+#remove NA
 sapply(listings, function(x) sum(is.na(x)))
 
-
-#remove because ***
-listings$number_of_days <- NULL
-listings$principal_balance <- NULL
-listings$loan_status_description <- NULL
-listings$prosper_rating <- NULL
-listings$listing_monthly_payment <- NULL
-
+#merge output variables together to default vs no default
 listings$loan_status[listings$loan_status == 1] <- 0
 listings$loan_status[listings$loan_status == 4] <- 0
-
 listings$loan_status[listings$loan_status == 2] <- 1
 listings$loan_status[listings$loan_status == 3] <- 1
 
@@ -48,18 +46,45 @@ listings <- listings[complete.cases(listings),]
 
 ```
 
-Exploration:
+## Data Exploration:
+
+
+###Structure of the Dataset:
+
+The dataset includes a large amount of variables. Some of these variables are aggregate variables (made from a combination of other variables) and some do not make sense to include in the prediction model from a domain perspective. Also, some variables may not be relevant to our prediciton. After exploration and cleaning, we can use logistic regression to remove the variables with little to no influence.
+
 ```{r}
+str(listings)
+```
+The variables that we can remove after exploration are:
+* income range
+* income_range_description
+* loan_status_description
+* loan origination date
+* Listing monthly payment (Can be calculated)
+* Occupation: High number of factors
+
+# Analysis of Amount Funded
+We begin by examining the distribution of amount funded for each succesful loan.
+```{r, echo = FALSE}
 qplot(x = amount_funded, data = listings,
       binwidth = 1000, colour = I("#424242"), fill = I("#0077C0")) +
   scale_x_continuous(breaks = seq(0, 35000, 5000))
 ```
 Here we plot the count for each amount funded. We find that the majority of the people are looking for smaller loans, and it trails out towards the upper limits of ~35,000. Another interesting thing to note is the spikes at each interval of 5000.
+### Analysis of income range description
 
+
+
+```{r, echo = FALSE}
+qplot(x = income_range_description, data = listings, fill = I("#0077C0")) +
+  scale_x_discrete(limits = c("Not employed", "$0", "$1-24,999", "$25,000-49,999", "$50,000-74,999", "$75,000-99,999", "$100,000+", "Not displayed"))
+```
+Here we plot the distribution of the income ranges for the borrowers. We find that it does not necessarily follow a normal distribution, with the majority of the borrows have less than 75,000.
 
 
 For predictive purposes we will go ahead and assume that incomplete loans which are paid per schedule will be completed per schedule. Similarly, we will convert loans which are sold off to colleciton agencies as defaulted.
-```{r}
+```{r, echo = FALSE}
 listings$originaldate <- listings$loan_origination_date
 listings$originaldate <- as.Date(listings$originaldate, "%m/%d/%Y")
 listings$loan_origination_date <- as.Date(listings$loan_origination_date, "%m/%d/%Y")
@@ -69,9 +94,10 @@ listings$loan_origination_date <- listings$loan_origination_date-15705
 
 ##Time Analysis
 We look to explore how the the different variables differ over time. 
-###Analysis per Month
+
+### Analysis per Quarter
 We will start by analysing the potential variation in the amount of loans taken and proportion of defaults among financial quarters.
-```{r cars}
+```{r , echo= FALSE}
 #We split up our time variable into the four financial quarters and create a new variable for this data to be saved to.
 Calculatequarters <- function(date) {
   
@@ -94,8 +120,10 @@ ggplot(aes(x=quarters), data=listings) + geom_bar(aes(fill=factor(loan_status)))
 ```
 This bar chart is highly interesting, as it seems as if people tend to increasingly take out loans as the year progresses.
 
+
+### Analysis By Monthly Quarter Exploration
 Additionally, it seems as if the rate of default is lower as the year progresses, especially in the last financial quarter. To test this hypothesis we will calculate and plot the actual numbers for proportion of default.
-```{r}
+```{r, echo = FALSE}
 Q1 <- sum(listings$quarters == 1)
 Q1_1 <- sum(listings$quarters == 1 & listings$loan_status==1)
 Q1Ratio <- Q1_1/Q1
@@ -121,8 +149,10 @@ plot(DefaultbyQuarter, type="o", col="blue")
 ```
 Here it becomes entirely clear to us that the rate of default substantially decreases with each financial quarter. This is a valuable finding which calls for further exploration.
 
+### Default by Month Analysis
+
 We will proceed by redoing the previous analysis per month. This could potentially show us whether certain months are drivers of the increased amount of loans and decreased default rates.
-```{r}
+```{r, echo = FALSE}
 Calculatemonths <- function(date2) {
 
   if(date2 <= 31) {
@@ -163,7 +193,7 @@ ggplot(aes(x=months), data=listings) + geom_bar(aes(fill=factor(loan_status))) +
 It appears as if there is near linear growth from January until September, which is quite interesting in itself. Additionally, for November and December there appears to be a non-proportional growth in default rates, which could be an option for arbitrage.
 
 Let's continue by calculating the default rates.
-```{r}
+```{r, echo = FALSE}
 M1 <- sum(listings$months == 1)
 M1_1 <- sum(listings$months == 1 & listings$loan_status==1)
 M1Ratio <- M1_1/M1
@@ -217,8 +247,10 @@ plot(monthsratio, type="o", col="blue")
 ```
 As suspected, the default rates of especially November and December are substantially lower than other months.
 
+### Default Rate vs Borrow Rate vs Month: Arbitrage Opportunity
+
 However, to check whether an investor would be able to find opportunity for arbitrage here, one would need to measure up the rate of default to the interest rate of loans. It could be that the months of November and December are simply filled with ideal loan candidates, demanding low borrowing rates. Let's try to roughly estimate how the two match up over the year.
-```{r}
+```{r, echo = FALSE}
 #We create a range of months for our future data frame
 monthsvector <- c(1,2,3,4,5,6,7,8,9,10,11,12)
 #We use the tapply function to find the mean borrowing rate for each month.
@@ -237,11 +269,11 @@ twoord.plot(1:12, dataframe$monthsratio, 1:12, dataframe$monthsrate, xlab="Month
 ```
 It here becomes clear to us that there does not seem to be a significant enough drop in borrowing rate for November and December to divert from investing in November and December. In conclusion, we believe to have found significant arbitrage opportunities for future investing.
 
-###Weekdays
+### Analysis by Day of Week
 As our previous analysis proved quite succesful, we will look towards further analysis how time might impact the default rate. This time we will further investigate the difference between weekdays and weekends.
 
 We will start by labelling our date columns the name of each day.
-```{r}
+```{r, echo = FALSE}
 listings$day <- wday(listings$originaldate, label=TRUE)
 summary(listings$day)
 ```
@@ -267,8 +299,10 @@ Disappoingly, there does not seem to be any significant differences between week
 
 
 
+### Analysis By Scorex
+
 Scorex is the credit score of the user, it goes from < 600, to 778+. 
-```{r}
+```{r, echo = FALSE}
  
 scorex <- listings %>%
     group_by(scorex) %>%
@@ -284,6 +318,20 @@ levels(listings$scorex) <- c(600,610,630,645,660,675,695,711,735.5,762, 778)
 listings$scorex <- as.numeric(as.character(listings$scorex))
 
 ```
+
+Default by Scorex
+```{r, echo = FALSE}
+listingsByScorex<- listings %>%
+   group_by(scorex) %>%
+    summarise(sum = n(), prop = sum(loan_status == 1)/n())
+
+plot<-ggplot(data=listingsByScorex, aes(x=scorex, y=prop, fill = (scorex)))+
+  geom_bar(stat="identity" )
+plot 
+
+```
+Scorex: As the scorex increases, the likelihood of defaulting decreases. 
+
  
 Prosper Score is a score from 1-11 with 1 being lowest risk. Because this is a score that we did not create we don't know what went into it. In addition the data they are using is probably the same data we are using so it does not provide any novel new information to the model. Lets remove it.
 ```{r}
@@ -297,20 +345,16 @@ listings category ID is a category of the Loan but there is no description to go
 
 Income range, Income Range Description, Stated Monthly Income. We don't want this datapoint to be overrepresented in the model. Therefore we only need one of these variables. Lets go with Stated Monthly Income since it is more granular than the broad income range. 
 TO DO: Some of the algorithms will find that they are highly correlated and won't "Count them as double"... which ones?
-```{r}
-qplot(x = income_range_description, data = listings, fill = I("#0077C0")) +
-  scale_x_discrete(limits = c("Not employed", "$0", "$1-24,999", "$25,000-49,999", "$50,000-74,999", "$75,000-99,999", "$100,000+", "Not displayed"))
-```
-Here we plot the distribution of the income ranges for the borrowers. We find that it does not necessarily follow a normal distribution, with the majority of the borrows have less than 75,000.
 
-```{r}
+
+### Analysis by Stated Monthly Income
+
+```{r, echo = FALSE}
 
 #??? why?
 
-
-
-listings$income_range   <- NULL
-listings$income_range_description  <- NULL
+#listings$income_range   <- NULL
+#listings$income_range_description  <- NULL
 
 income <- listings %>%
     group_by(stated_monthly_income) %>%
@@ -321,9 +365,15 @@ plot<-ggplot(data=listings, aes(listings$stated_monthly_income))+
   geom_histogram(binwidth = 250) + xlim(0, 50000)
 plot
 ```
+Here we plot a histrogram of the stated monthly income for each borrower. *** analyze
 
-Income Verifiable, looks good and useful. Have to modify to be a factor first. 
-```{r}
+
+
+
+### Analyis of Income Verifiable
+
+Income Verifiable, looks good and useful. Have to modify to be a factor first. Will be interested to see if it being verified has impact on default.
+```{r, echo = FALSE}
 
 listings$income_verifiable <- factor(listings$income_verifiable)
 
@@ -338,9 +388,24 @@ plot
 plot<-ggplot(data= listings, aes(x=income_verifiable, y=stated_monthly_income)) + geom_boxplot()  +   coord_cartesian(ylim=c(0, 15000))
 plot
 ```
+We find that there are many more people with their income verfied then not.
 
-DTI WProsper Loan, debt to income ratio.
-```{r}
+```{r, echo = FALSE}
+
+lByVerified <-listings %>%
+    group_by(income_verifiable) %>%
+    summarise(sum = n(), prop = sum(loan_status == 1)/n())
+
+
+
+plot<-ggplot(data=lByVerified, aes(x=income_verifiable, y=prop, fill = (income_verifiable)))+
+  geom_bar(stat="identity" )
+plot 
+
+```
+
+
+```{r, echo = FALSE}
 loanRatioOne <- listings %>%
     filter(dti_wprosper_loan > 1) %>%
     summarise(count = n())
@@ -358,12 +423,11 @@ listings$dti_wprosper_loan[is.na(listings$dti_wprosper_loan)] = median(listings$
 
 
 ```
-TO DO: Why does this have to be a value less than 1?
 
 
-Employment Status Description & Employment.
+### Analysis by Employment Status Description & Employment.
 There are blank values for occupation when someone chooses "Other for Employment Status Description". Lets fix this. 
-```{r}
+```{r, echo = FALSE}
 
 
 levels(listings$occupation)[levels(listings$occupation) == ""]<- "Other"
@@ -386,11 +450,12 @@ plot
 
 
 ```
+The majority are employed, self employed or other.
 
+Months employed had values less than 0, we remove them and set it back to the median month.
 ```{r}
-#listingsample$is_homeowner <- as.factor(listingssample$is_homeowner)
 
-
+#
 listings$months_employed[listings$months_employed <0] <- NA
 
 listings$months_employed[is.na(listings$months_employed)] = median(listings$months_employed, na.rm=TRUE)
@@ -402,8 +467,9 @@ listings$months_employed[is.na(listings$months_employed)] = median(listings$mont
 
 ##Feature Engineering and Geographic Exploration
 
+Since the data provideds use with borrow state, it would be interesting to explore the distribution of the geographic location.
 
-```{r}
+```{r, echo = FALSE}
 
 #converts  initials to full name
 stateFromLower <-function(x) {
@@ -436,50 +502,20 @@ stateFromLower <-function(x) {
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 #convert state name
 listings$borrower_state <- trimws(listings$borrower_state)
 listings$borrower_state <- as.factor(listings$borrower_state)
 listings$region <- stateFromLower(listings$borrower_state)
 ```
 
-```{r}
-library(fiftystater)
+###  States by count of borrowers
+```{r, echo = FALSE}
 data("fifty_states")
 all_states <- map_data("state")
 #plot all states with ggplot
 keep <-c("region", "loan_status")
-listingsByStates <- listings[keep]
-
-listingsByStates<- listings %>%
-     group_by(region) %>%
-    summarise(sum = n(), prop = sum(loan_status == 1)/n())
-
-  
 states <-  distinct(all_states, region, .keep_all = TRUE)
-map <- merge(states, listingsByStates, by="region", all.x=F)
-
-
-
-p <- ggplot(listingsByStates, aes(map_id = region)) + 
-  # map points to the fifty_states shape data
-  geom_map(aes(fill = prop), map = fifty_states) + 
-  scale_fill_gradient(low = "yellow", high = "red") +
-  expand_limits(x = fifty_states$long, y = fifty_states$lat) +
-  coord_map() +
-  scale_x_continuous(breaks = NULL) + 
-  scale_y_continuous(breaks = NULL) +
-  labs(x = "", y = "") +
-  theme(legend.position = "bottom", 
-        panel.background = element_blank()) +
-  ggtitle("States By Probability of Listings Default")
-
-p + fifty_states_inset_boxes() 
-
-```
-A look at the probability of default by states. We find that **
-
-```{r}
 StatesCount<- listings %>%
      group_by(region) %>%
       summarise(count = n())
@@ -504,8 +540,45 @@ stateByCount + fifty_states_inset_boxes()
 ```
 We find that california is the most popular state, followed by texas and new york. This makes sense since they are the biggest states.
 
+### States by Proportion of Default
+```{r, echo = FALSE}
+
+
+listingsByStates <- listings[keep]
+
+listingsByStates<- listings %>%
+     group_by(region) %>%
+    summarise(sum = n(), prop = sum(loan_status == 1)/n())
+
+  
+map <- merge(states, listingsByStates, by="region", all.x=F)
+
+
+
+p <- ggplot(listingsByStates, aes(map_id = region)) + 
+  # map points to the fifty_states shape data
+  geom_map(aes(fill = prop), map = fifty_states) + 
+  scale_fill_gradient(low = "yellow", high = "red") +
+  expand_limits(x = fifty_states$long, y = fifty_states$lat) +
+  coord_map() +
+  scale_x_continuous(breaks = NULL) + 
+  scale_y_continuous(breaks = NULL) +
+  labs(x = "", y = "") +
+  theme(legend.position = "bottom", 
+        panel.background = element_blank()) +
+  ggtitle("States By Probability of Listings Default")
+
+p + fifty_states_inset_boxes() 
+
+```
+A look at the probability of default by states. We find that **
+
+
 ## Cost of Living By State
-```{r}
+
+Since each state has a varying costs of living, we thought it would be interesting to explore if this has influence on the probability of default. We found a dataset bytheCouncil for Community & Economic Research (C2ER) that ranks each state by their Cost of living.
+
+```{r, echo= FALSE}
 
   col <- read.csv("costofliving.csv")
   col <- col[, 1:2]
@@ -524,7 +597,10 @@ We find that california is the most popular state, followed by texas and new yor
 ```
 As the Cost of Living for each state rank goes up (less costly), likely hood of default goes down.
 
-```{r}
+
+### Analysis by Borrower Rate
+
+```{r, echo = FALSE}
 
 
 listingsByRates<- listings %>%
@@ -536,30 +612,11 @@ plot<-ggplot(data=listingsByRates, aes(x=borrower_rate, y=prop, fill = (borrower
 plot 
 
 
+```
 
 
-listingsByScorex<- listings %>%
-   group_by(scorex) %>%
-    summarise(sum = n(), prop = sum(loan_status == 1)/n())
+```{r, echo = FALSE}
 
-
-
-
-plot<-ggplot(data=listingsByScorex, aes(x=scorex, y=prop, fill = (scorex)))+
-  geom_bar(stat="identity" )
-plot 
-
-
-listingByIncomeRangeDesc <-listings %>%
-    group_by(income_range_description) %>%
-    summarise(sum = n(), prop = sum(loan_status == 1)/n())
-
-
-
-
-plot<-ggplot(data=listingByIncomeRangeDesc, aes(x=income_range_description, y=prop, fill = (income_range_description)))+
-  geom_bar(stat="identity" )
-plot 
 
 
 listingByIncomeRange <-listings %>%
@@ -572,16 +629,6 @@ plot<-ggplot(data=listingByIncomeRange, aes(x=income_range, y=prop, fill = (inco
   geom_bar(stat="identity" )
 plot 
 
-
-lByVerified <-listings %>%
-    group_by(income_verifiable) %>%
-    summarise(sum = n(), prop = sum(loan_status == 1)/n())
-
-
-
-plot<-ggplot(data=lByVerified, aes(x=income_verifiable, y=prop, fill = (income_verifiable)))+
-  geom_bar(stat="identity" )
-plot 
 
 
 
@@ -597,7 +644,6 @@ plot<-ggplot(data=lByListingTime, aes(x=listing_term, y=prop, fill = (listing_te
 plot 
 
 ```
-Scorex: As the scorex increases, the likelihood of defaulting decreases. 
 Income Range: As the scorex increases, the likelihood of defaulting decreases. **
 Income Verifiable: Income without being verified are less likely of being defaulted. This is somewhat different than what we expected
 By listing term: The longer the listing term, the more likely a borrower is to default.
@@ -607,8 +653,11 @@ By listing term: The longer the listing term, the more likely a borrower is to d
 
 
 
-## Top 500 cities by GPD
-```{r}
+## Top 500 cities by GPD Analysis
+
+Another aspect of location that we wanted to explore was cities. Since there were so many cities, we realized we needed to reduce this to a more measurable aspect. To do this, we took a dataset from Bureau of Economic Analysis which provided a list of the top 500 metropolotian areas with the best GDP. We parsed the cities from this and then created a new factor that marks each city as either major GDP or not major GDP.
+
+```{r, echo = FALSE}
 
 #cleaning
 listings$borrower_city <- trimws(listings$borrower_city)
@@ -617,7 +666,6 @@ listings$borrower_city <- as.factor(listings$borrower_city)
 citi <- read.csv("gdp_metro0917.csv")
 citi$City <- tolower(citi$City)
 citi$State <- NULL
-library(tidyr)
 
 citi <- citi%>%mutate(City=strsplit(as.character(City),'-'))%>%unnest(City)
 citi<-citi[!(citi$City==""),]
@@ -634,25 +682,55 @@ plot
 After separating the cities into two groups, either in the top 500 gpd producing metro's or not major, we find little correlation.
 
 
+```{r, echo =FALSE}
+#change first recorded line
+listings$first_recorded_credit_line <- as.character(listings$first_recorded_credit_line)
+listings$first_recorded_credit_line <- as.Date(listings$first_recorded_credit_line, "%m%d%Y")
+listings$first_recorded_credit_line <- as.numeric(Sys.Date() - listings$first_recorded_credit_line)
 
-Aggregate Variable
+
+```
+
+
+
+### Aggregate Variable of delinquencies
 ```{r}
 listings$delinq_agg <- listings$delinquencies_over30_days + 2*listings$delinquencies_over60_days + 4*listings$delinquencies_over90_days
 ```
 
+
+# Final Cleaing of Variables
 
 ```{r}
 #drop high factor level
 #listingssample$borrower_city <- NULL   
 #listingssample$borrower_state <- NULL
 
-listingsample<- listings[, !(colnames(listings) %in% c("State", "region", "originaldate", "first_recorded_credit_line", "borrower_city", "borrower_state", "occupation", "public_records_last12_months", "Rank", "delinquencies_over30_days", "delinquencies_over90_days", "delinquencies_over60_days", "borrower_rate", "lender_indicator"))]
+# TODO: convert first_recorded to date
+listings$borrower_rate <- NULL
+listings$number_of_days <- NULL 
+listings$principal_balance <- NULL
+listings$loan_status_description <- NULL
+listings$loan_origination_date <- NULL
+listings$listing_monthly_payment <- NULL
+listings$listing_category_id <- NULL
+listings$income_range <-NULL
+listings$income_range_description <-NULL
+listings$first_recorded_credit_line <- NULL
+
+listings$months <- as.factor(listings$months)
+listings$is_homeowner <-as.factor(listings$is_homeowner)
+levels(listings$employment_status_description) <- c("Employed", "Fulltime", "NotEmployed", "other", "Parttime", "Retired", "SelfEmployed" )
+
+
+listingsample<- listings[, !(colnames(listings) %in% c("State", "region", "originaldate", "borrower_city", "borrower_state", "occupation", "Rank", "delinquencies_over30_days", "delinquencies_over90_days", "delinquencies_over60_days"))]
 
 #drop aggregates
-listingsample<- listingsample[, !(colnames(listingsample) %in% c("scorex", "dti_wprosper_loan"))]
+#remove borrow_rate because its not includede in the bidding
 
-listingsample$months <- as.factor(listingsample$months)
-levels(listingsample$employment_status_description) <- c("employed", "Fulltime", "NotEmployed", "other", "parttime", "retired", "selfEmployed" )
+listing_no_agg<- listingsample[, !(colnames(listingsample) %in% c("scorex", "dti_wprosper_loan", "prosper_rating"))]
+
+
 
 ```
 
@@ -668,14 +746,61 @@ levels(listingsample$employment_status_description) <- c("employed", "Fulltime",
 
 ```{r}
 logReg <- glm(loan_status ~ ., data = listingsample, family = "binomial")
-str(listingsample)
 summary(logReg)
+```
+
+```{}
+Comments -
+
+the following variables are stastically significant and have a fairly strong impact on on our response variable, loan_status -
+1. amount_funded
+2. listing_term
+3. scorex
+4. stated_monthly_income
+5. income_verifiableTRUE
+6. employment_status_descriptionother
+7. months_employed
+8. monthly_debt
+9. inquiries_last6_months
+10. total_open_revolving_accounts
+11. installment_balance
+
+Most of these are summary variables and their presence masks the impact other variables can have on loan_status.
+As a result, we will run another regression without these summary variables
+
+```
+
+```{r}
+logReg_revised <- glm(loan_status ~ . ,
+                      data = listing_no_agg, family = "binomial")
+summary(logReg_revised)
+```
+
+```{}
+Comments -
+
+After removing the summary variable, we know that the following variables impact loan_status
+1. amount_funded
+2. listing_term
+3. scorex
+4. stated_monthly_income
+5. income_verifiableTRUE
+6. employment_status_descriptionother
+7. months_employed
+8. monthly_debt
+9. inquiries_last6_months
+10. total_open_revolving_accounts
+11. installment_balance
+
+Most of these are summary variables and their presence masks the impact other variables can have on loan_status.
+As a result, we will run another regression without these summary variables
+
 ```
 
 
 # Getting Data Ready for Machine Learning Models
 
-Since our dataset is relatively small ~33,300 after cleaning and the proportion of our predictor variable is low ~13%, we refine our dataset to have a more equal distribution of the two outcomes. This will help prevent overfitting or poor classification results. From our datset, about 4292 default and 29008 do not default. 
+Since our dataset is relatively small ~33,300 after cleaning and the proportion of our predictor variable is low ~13%, we refine our dataset to have a more equal distribution of the two outcomes. This will help prevent overfitting or poor classification results. From our datset, about 4292 default and 29008 do not default.
 ```{r}
 default_listings <- listingsample[listingsample$loan_status == 1, ]
 no_default_listings <- listingsample[listingsample$loan_status == 0, ]
@@ -689,11 +814,6 @@ listingsample <- rbind(no_default_listings_sample, default_listings)
 
 ```
 
-
-```{r}
-
-```
-
 ```{r}
 # Randomizing  dataset
 set.seed(12345)
@@ -702,14 +822,15 @@ listing_rand <- listingsample[order(runif(12892)),]
 listing_rand$loan_status <- as.factor(listing_rand$loan_status)
 loan_status <- listing_rand[1]
 
+str(listing_rand)
 l_dummy <-model.matrix(~ . -1, data = listing_rand[-1])
 l_dummy <- as.data.frame(scale(l_dummy))
 l_dummy<- cbind(loan_status, l_dummy)
 
-
 #library(plyr)
 #l_dummy<- rename(l_dummy, c("beta"="two", "gamma"="three"))
 names(l_dummy)[names(l_dummy)=="scorex< 600"] <- "scorexLess"
+
 names(l_dummy)[names(l_dummy)=="scorex600-619"] <- "sx619"
 names(l_dummy)[names(l_dummy)=="scorex620-639"] <- "sx639"
 names(l_dummy)[names(l_dummy)=="scorex640-649"] <- "sx649"
@@ -726,10 +847,10 @@ names(l_dummy)[names(l_dummy)=="day^5"] <- "day5"
 names(l_dummy)[names(l_dummy)=="day^6"] <- "day6"
 names(l_dummy)[names(l_dummy)=="top_ten_gdpNot Major"] <- "nogdp"
 
-train_data_indicies <- sample(1:nrow(l_dummy), 
-                              replace = F, 
-                              size = floor(nrow(l_dummy) * 0.8)) 
-                  
+train_data_indicies <- sample(1:nrow(l_dummy),
+                              replace = F,
+                              size = floor(nrow(l_dummy) * 0.8))
+
 train_data <- l_dummy[train_data_indicies, ]
 test_data <- l_dummy[-train_data_indicies, ]
 #listings_random <- listings[sample(nrow(listings)),]
@@ -739,19 +860,12 @@ round(prop.table(table(train_data$loan_status)) * 100, 1)
 round(prop.table(table(test_data$loan_status)) * 100, 1)
 
 
-#listing_formula <- colnames(train_data) %>% 
-#    {paste(.[! . %in% "loan_status"], collapse = " + ")} %>% 
-#    paste("loan_status ~ ", .) %>% 
+#listing_formula <- colnames(train_data) %>%
+#    {paste(.[! . %in% "loan_status"], collapse = " + ")} %>%
+#    paste("loan_status ~ ", .) %>%
 #    as.formula()
 
 ```
-
-
-
-
-
-
-
 
 
 #accuracy function
@@ -769,14 +883,12 @@ accuracy <- function(predicted, trueval, model, hideoutput = F) {
 # Data Prediction using kNN
 
 ```{r}
-library(class)
-library(gmodels)
+
 knn_listing_pred <- knn(train = train_data, test = test_data,
-                      cl = train_data$loan_status, k = 20) 
-                      # k = sqrt(population size: 33542) = 183 
+                      cl = train_data$loan_status, k = 20)
+                      # k = sqrt(population size: 33542) = 183
 # confusion matrix
 CrossTable(test_data$loan_status, knn_listing_pred,
-           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
            dnn = c('Actual Loan Status', 'Predicted Loan Status'))
 
 Kappa(table(knn_listing_pred, test_data$loan_status))
@@ -784,8 +896,6 @@ Kappa(table(knn_listing_pred, test_data$loan_status))
 a1 = accuracy(knn_listing_pred, test_data$loan_status, "KNN with k = 20", TRUE)
 
 ```
-
-
 
 
 #Decision Tree
@@ -804,10 +914,9 @@ default_decision_pred <- predict(default_decision_tree, test_data)
 # cross tabulation of predicted versus actual classes
 
 CrossTable(test_data$loan_status, default_decision_pred,
-           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
            dnn = c('Actual Loan Status', 'Predicted Loan Status'))
 
- 
+
 
 Kappa(table(default_decision_pred, test_data$loan_status))
 
@@ -829,7 +938,6 @@ prop.table(table(Decision_Tree_Predict_Bagged == train_data$loan_status))
 
 # cross tabulation of predicted v/s actual classes
 CrossTable(test_data$loan_status, Decision_Tree_Predict_Bagged,
-           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
            dnn = c('Actual Loan Status', 'Predicted Loan Status'))
 
 Kappa(table(Decision_Tree_Predict_Bagged, test_data$loan_status))
@@ -845,7 +953,7 @@ Lets attempt to improve your model with a cost matrix.
 Decision_Tree_Error_Cost_Matrix <- matrix(c(0, 1, 4, 0), nrow = 2)
 
 # create model - apply the cost matrix to the tree
-Decision_Tree_Error_Cost_Model <- C5.0(train_data[-1], 
+Decision_Tree_Error_Cost_Model <- C5.0(train_data[-1],
                                        train_data$loan_status,
                                        costs = Decision_Tree_Error_Cost_Matrix)
 
@@ -856,7 +964,7 @@ Decision_Tree_Error_Cost_Prediction <- predict(Decision_Tree_Error_Cost_Model, t
 # creating a proportion table to check model accuacy
 prop.table(table(Decision_Tree_Error_Cost_Prediction == train_data$loan_status))
 # cross tabulation of predicted v/s actual classes
-CrossTable(test_data$loan_status, Decision_Tree_Error_Cost_Prediction, 
+CrossTable(test_data$loan_status, Decision_Tree_Error_Cost_Prediction,
            dnn = c('actual loan_status', 'predicted loan_status'))
 
 a4= accuracy(Decision_Tree_Error_Cost_Prediction, test_data$loan_status, "C5.0 Decision Tree with cost matrix", TRUE)
@@ -889,7 +997,6 @@ mean(unlist(folding_results))
 # Data Prediction using Neural Nets
 
 ```{r}
-library(neuralnet)
 # confirm that the range is now between zero and one
 train_data$loan_status <- as.numeric(train_data$loan_status)
 
@@ -909,7 +1016,6 @@ cor(predicted, test_data$loan_status)
 Random Forest:
 
 ```{r}
-library(randomForest)
 rf <- randomForest(loan_status ~ ., data = train_data)
 rf_pred <- predict(rf, test_data)
 a7 = accuracy(rf_pred, test_data$loan_status, "Random Forest", TRUE)
