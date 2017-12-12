@@ -79,13 +79,15 @@ qplot(x = amount_funded, data = listings,
       binwidth = 1000, colour = I("#424242"), fill = I("#0077C0")) +
   scale_x_continuous(breaks = seq(0, 35000, 5000))
 ```
-  Here we plot the count for each amount funded. We find that the majority of the people are looking for smaller loans, and it trails out towards the upper limits of ~35,000. Another interesting thing to note is the spikes at each interval of 5000.
+
+Here we plot the count for each amount funded. We find that the majority of the people are looking for smaller loans, and it trails out towards the upper limits of ~35,000. Another interesting thing to note is the spikes at each interval of 5000.
 
 
 ```{r, echo = FALSE}
 qplot(x = income_range_description, data = listings, fill = I("#0077C0")) +
   scale_x_discrete(limits = c("Not employed", "$0", "$1-24,999", "$25,000-49,999", "$50,000-74,999", "$75,000-99,999", "$100,000+", "Not displayed"))
 ```
+
 Here we plot the distribution of the income ranges for the borrowers. We find that it does not necessarily follow a normal distribution, with the majority of the borrows have less than 75,000. Also it is interesting that there are very few non-employed people asking for loans. 
 
 For predictive purposes we will go ahead and assume that incomplete loans which are paid per schedule will be completed per schedule. Similarly, we will convert loans which are sold off to colleciton agencies as defaulted.
@@ -123,6 +125,7 @@ listings$quarters <- as.integer(listings$quarters)
 
 ggplot(aes(x=quarters), data=listings) + geom_bar(aes(fill=factor(loan_status)))
 ```
+
 This bar chart is highly interesting, as it seems as if people tend to increasingly take out loans as the year progresses. One notable aspect of the graph is that the highest volume quarter for loans is the fourth quarter. This could relate to the holiday season where there is added pressure to buy gifts. 
 
 ### Analysis By Monthly Quarter Exploration
@@ -151,6 +154,7 @@ Q4Ratio
 DefaultbyQuarter <- c(Q1Ratio, Q2Ratio, Q3Ratio, Q4Ratio)
 plot(DefaultbyQuarter, type="o", col="blue")
 ```
+
 Here it becomes entirely clear to us that the rate of default substantially decreases with each financial quarter. This is a valuable finding which calls for further exploration.
 
 ### Default by Month Analysis
@@ -194,6 +198,7 @@ for(i in 1:NROW(listings$loan_origination_date)){
 
 ggplot(aes(x=months), data=listings) + geom_bar(aes(fill=factor(loan_status))) + scale_x_discrete(limits=c(1,2,3,4,5,6,7,8,9,10,11,12))
 ```
+
 It appears as if there is near linear growth from January until September, which is quite interesting in itself. Additionally, for November and December there appears to be a non-proportional growth in default rates, which could be an option for arbitrage.
 
 Let's continue by calculating the default rates.
@@ -249,6 +254,7 @@ M12Ratio <- M12_1/M12
 monthsratio <- c(M1Ratio,M2Ratio,M3Ratio,M4Ratio,M5Ratio,M6Ratio,M7Ratio,M8Ratio,M9Ratio,M10Ratio,M11Ratio,M12Ratio)
 plot(monthsratio, type="o", col="blue")
 ```
+
 As suspected, the default rates of especially November and December are substantially lower than other months. 
 
 ### Default Rate vs Borrow Rate vs Month: Arbitrage Opportunity
@@ -271,6 +277,7 @@ twoord.plot(1:12, dataframe$monthsratio, 1:12, dataframe$monthsrate, xlab="Month
             xtickpos = 1:12,
             xticklab=month.name[1:12])
 ```
+
 It here becomes clear to us that there does not seem to be a significant enough drop in borrowing rate for November and December to divert from investing in November and December. In conclusion, we believe to have found significant arbitrage opportunities for future investing.
 
 ### Analysis by Day of Week
@@ -334,6 +341,7 @@ plot<-ggplot(data=listingsByScorex, aes(x=scorex, y=prop, fill = (scorex)))+
 plot 
 
 ```
+
 Scorex: As the scorex increases, the likelihood of defaulting decreases. 
 
 
@@ -351,6 +359,7 @@ plot<-ggplot(data=listings, aes(listings$stated_monthly_income))+
   geom_histogram(binwidth = 250) + xlim(0, 50000)
 plot
 ```
+
 Here we plot a histrogram of the stated monthly income for each borrower. *** analyze
 
 
@@ -374,6 +383,7 @@ plot
 plot<-ggplot(data= listings, aes(x=income_verifiable, y=stated_monthly_income)) + geom_boxplot()  +   coord_cartesian(ylim=c(0, 15000))
 plot
 ```
+
 We find that there are many more people with their income verfied then not.
 
 ```{r, echo = FALSE}
@@ -430,12 +440,8 @@ employment <- listings %>%
 plot<-ggplot(data=employment, aes(x=employment_status_description, y=count, fill=employment_status_description))+
   geom_bar(stat="identity" , position = "dodge")
 plot
-
-
-#listingssample <- listings[sample(nrow(listings)),]
-
-
 ```
+
 The majority are employed, self employed or other.
 
 Months employed had values less than 0, we remove them and set it back to the median month.
@@ -524,6 +530,7 @@ stateByCount <- ggplot(StatesCount, aes(map_id = region)) +
 
 stateByCount + fifty_states_inset_boxes() 
 ```
+
 We find that California is the most popular state, followed by Texas and New York. This makes sense since they are the states with the highest population. In addition North Dakota and Iowa dont have almost any users. Prosper's headquarters are in San Francisco, California so another reason might be that the marketing they do is around where the company is run. 
 
 ### States by Proportion of Default
@@ -557,6 +564,7 @@ p <- ggplot(listingsByStates, aes(map_id = region)) +
 p + fifty_states_inset_boxes() 
 
 ```
+
 A look at the probability of default by states. We find that some of the midwestern states such as Nevada had higher probabilitiy of defaults than the coastal states. 
 
 ## Cost of Living By State
@@ -571,15 +579,16 @@ Since each state has a varying costs of living, we thought it would be interesti
   listings<- merge(listings, col, by = "region")
   
   
-  defaultByStateCOL <-listings %>%
-      group_by(Rank) %>%
-      summarise(sum = n(), prop = sum(loan_status == 1)/n())
+ defaultByStateCOL <-listings %>%
+  group_by(Rank) %>%
+  summarise(sum = n(), prop = sum(loan_status == 1)/n())
   
   plot<-ggplot(data=defaultByStateCOL, aes(x=Rank, y=prop, fill = (Rank)))+
-    geom_bar(stat="identity" ) + geom_smooth()
+  geom_bar(stat="identity" ) + geom_smooth()
   plot 
 
 ```
+
 As the Cost of Living for each state rank goes up (less costly), likely hood of default goes down.
 
 
@@ -630,7 +639,8 @@ plot
 
 ```
 
-  Income Range: As the scorex increases, the likelihood of defaulting decreases. 
+
+Income Range: As the scorex increases, the likelihood of defaulting decreases. 
 Income Verifiable: Income without being verified are less likely of being defaulted. This is somewhat different than what we expected
 By listing term: The longer the listing term, the more likely a borrower is to default.
 
@@ -665,6 +675,7 @@ plot<-ggplot(data=defaultByGDP, aes(x=is_major_gdp, y=prop, fill = (is_major_gdp
   geom_bar(stat="identity",  position = "dodge")
 plot 
 ```
+
 After separating the cities into two groups, either in the top 500 gpd producing metro's or not major, we find little correlation.
 
 
@@ -1024,7 +1035,7 @@ a4= accuracy(Decision_Tree_Error_Cost_Prediction, test_data$loan_status, "C5.0 D
 ```
 ### Cross Validation
 
-run a 10-fold cross validation in an attempt to improve the model -
+We run a 10-fold cross validation in an attempt to improve the model
 
 ```{r}
 # randomizing the data set
