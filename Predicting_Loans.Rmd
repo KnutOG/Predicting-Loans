@@ -24,13 +24,14 @@ suppressPackageStartupMessages(require(tidyr))
 suppressPackageStartupMessages(require(class))
 suppressPackageStartupMessages(require(gmodels))
 suppressPackageStartupMessages(require(neuralnet))
+suppressPackageStartupMessages(require(caret))
 
 listings <- read.csv("Listings2013.csv")
 ```
 
 ## Data Cleaning
 As part of our exploration of our dataset, we find several variables to be irrelevant to further analysis. The variables deleted are found irrelevant as they are aggregate variables or identical variables.
-```{r, include = FALSE}
+```{r, include = FALSE} 
 #remove NA
 sapply(listings, function(x) sum(is.na(x)))
 
@@ -375,7 +376,7 @@ Here we plot a histrogram of the stated monthly income for each borrower. *** an
 Income Verifiable, looks good and useful. Have to modify to be a factor first. Will be interested to see if it being verified has impact on default.
 ```{r, echo = FALSE}
 
-listings$income_verifiable <- factor(listings$income_verifiable)
+listings$income_verifiable <- as.factor(listings$income_verifiable)
 
 verifiable <- listings %>%
     group_by(income_verifiable) %>%
@@ -817,15 +818,21 @@ listingsample <- rbind(no_default_listings_sample, default_listings)
 ```{r}
 # Randomizing  dataset
 set.seed(12345)
-
 listing_rand <- listingsample[order(runif(12892)),]
-listing_rand$loan_status <- as.factor(listing_rand$loan_status)
+#listing_rand$loan_status <- as.factor(listing_rand$loan_status)
 loan_status <- listing_rand[1]
 
-str(listing_rand)
+
 l_dummy <-model.matrix(~ . -1, data = listing_rand[-1])
 l_dummy <- as.data.frame(scale(l_dummy))
 l_dummy<- cbind(loan_status, l_dummy)
+#normalize <- function(x) {
+#  return ((x - min(x)) / (max(x) - min(x)))
+#}
+#l_dummy <- as.data.frame(lapply(l_dummy, normalize))
+#l_dummy<- cbind(loan_status, l_dummy)
+
+
 
 #library(plyr)
 #l_dummy<- rename(l_dummy, c("beta"="two", "gamma"="three"))
@@ -846,6 +853,8 @@ names(l_dummy)[names(l_dummy)=="day^4"] <- "day4"
 names(l_dummy)[names(l_dummy)=="day^5"] <- "day5"
 names(l_dummy)[names(l_dummy)=="day^6"] <- "day6"
 names(l_dummy)[names(l_dummy)=="top_ten_gdpNot Major"] <- "nogdp"
+
+
 
 train_data_indicies <- sample(1:nrow(l_dummy),
                               replace = F,
@@ -877,6 +886,72 @@ accuracy <- function(predicted, trueval, model, hideoutput = F) {
   if (!hideoutput) {cat("Model:", model, "had", result, "accuracy\n")}
   return(result)
 }
+```
+<!-- # Data Prediction using Neural Nets -->
+
+<!-- ```{r} -->
+<!--  # confirm that the range is now between zero and one -->
+<!--  train_data$loan_status <- as.numeric(train_data$loan_status) -->
+<!-- #  -->
+<!-- # # ANN w/ hidden neuron = 1 -->
+<!--  neuralNet_model <- neuralnet(formula = loan_status ~ scorex   , data = train_data, hidden = 1) -->
+<!-- #  -->
+<!-- # # visualize the network topology -->
+<!--  plot(neuralNet_model) -->
+
+<!-- # # compute predicted values using test data and neuralNet_model -->
+<!--  neuralNet_results <- compute(neuralNet_model, test_data[-1]) -->
+<!--  predicted <- neuralNet_results$net.result -->
+
+<!-- # # examine the correlation between predicted and actual values -->
+<!--  cor(predicted, test_data$loan_status) -->
+<!-- ``` -->
+
+
+
+```{r}
+#train_data$loan_status <- as.factor(train_data$loan_status)
+```
+## Support Vector Machines - vanilladot
+
+```{r}
+library(kernlab)
+
+# Needs to be in a factor for SVM to be treated as a classification
+train_data$loan_status <- as.factor(train_data$loan_status)
+train_data$loan_status <- as.factor(train_data$loan_status)
+
+# vanilladot - Implement Model
+classifier_vanilladot <- ksvm(loan_status ~ ., data = train_data, kernel = "vanilladot")
+
+# vanilladot - Make Prediction
+prediction_vanilladot <- predict(classifier_vanilladot, test_data)
+
+# vanilladot - See some results
+prop.table(table(prediction_vanilladot, test_data$loan_status))
+
+# vanilladot - Evaluate overall efficency
+prop.table(table(prediction_vanilladot == test_data$loan_status))
+
+a8 = accuracy(prediction_vanilladot, test_data$loan_status, "Vanilla SVM", TRUE)
+
+```
+## SVM - rbfdot
+
+```{r}
+library(kernlab)
+
+# Needs to be in a factor for SVM to be treated as a classification
+
+# rbfdot
+classifier_rbfdot <- ksvm(loan_status ~ ., data = train_data, kernel = "rbfdot")
+prediction_rbfdot <- predict(classifier_rbfdot, test_data)
+#See some results
+prop.table(table(prediction_rbfdot, test_data$loan_status))
+#Evaluate overall efficency
+prop.table(table(prediction_rbfdot == test_data$loan_status))
+a9 = accuracy(prediction_vanilladot, test_data$loan_status, "rbfdot SVM", TRUE)
+
 ```
 
 
@@ -994,29 +1069,11 @@ mean(unlist(folding_results))
 ```
 
 
-# Data Prediction using Neural Nets
 
-```{r}
-# confirm that the range is now between zero and one
-train_data$loan_status <- as.numeric(train_data$loan_status)
-
-# ANN w/ hidden neuron = 1
-neuralNet_model <- neuralnet(formula = loan_status ~ scorex  + listing_category_id, data = train_data, hidden = 1)
-
-# visualize the network topology
-plot(neuralNet_model)
-
-# compute predicted values using test data and neuralNet_model
-neuralNet_results <- compute(neuralNet_model, test_data[-1])
-predicted <- neuralNet_results$net.result
-
-# examine the correlation between predicted and actual values
-cor(predicted, test_data$loan_status)
-```
 Random Forest:
 
 ```{r}
-rf <- randomForest(loan_status ~ ., data = train_data)
+rf <- randomForest(loan_status ~ listing_term+stated_monthly_income+income_verifiableTRUE+employment_status_descriptionother+months_employed+monthly_debt+public_records_last10_years+inquiries_last6_months+total_open_revolving_accounts+installment_balance+revolving_available_percent+total_inquiries+scorex, data = train_data)
 rf_pred <- predict(rf, test_data)
 a7 = accuracy(rf_pred, test_data$loan_status, "Random Forest", TRUE)
 Kappa(table(rf_pred, test_data$loan_status))
@@ -1030,11 +1087,11 @@ Stacked Model
 ```
 
 ```{r}
-acc_predictions = c(a1,a2,a3,a4)
+acc_predictions = c(a1,a2,a3,a4,a7,a8,a9 )
 #acc_predictions = c(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10)
-#names = c("Log Prediction Plain","Log Boosted","Log Step","SVM with Vanilla Kernal","SVM Radial Basis Kernal","Neural Net One Hidden Node","Neural Net Two Hidden Nodes","CTree Regression","Random Forest Classification","Ada Boost Classification")
+names = c("KNN", "Decision Tree Regression","Decision Tree Regression with 10 trials", "Decision Tree Regression with Cost Matrix", "Random Forest","SVM with Vanilla Kernal","SVM Radial Basis Kernal")
 
-names = c("Knn","Decision C5.0 Tree Regression","Decision Tree C5.0 Regression trails 10", "Decision Tree C5.0 with Cost Model", "Random Forest", "Stacked Model")
+#names = c("Knn","Decision C5.0 Tree Regression","Decision Tree C5.0 Regression trails 10", "Decision Tree C5.0 with Cost Model", "Random Forest", "Stacked Model")
 
 acc_mat <- data.frame(ModelName = names, accuracy = acc_predictions) %>% print
 ```
