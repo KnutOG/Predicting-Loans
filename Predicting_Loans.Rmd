@@ -32,6 +32,7 @@ listings <- read.csv("Listings2013.csv")
 ## Data Cleaning
 As part of our exploration of our dataset, we find several variables to be irrelevant to further analysis. The variables deleted are found irrelevant as they are aggregate variables or identical variables.
 ```{r, include = FALSE} 
+
 #remove NA
 sapply(listings, function(x) sum(is.na(x)))
 
@@ -57,7 +58,9 @@ The dataset includes a large amount of variables. Some of these variables are ag
 ```{r}
 str(listings)
 ```
-The variables that we can remove after exploration are:
+The variables that we can remove after exploration are:  
+
+
 * income range
 * income_range_description
 * loan_status_description
@@ -72,17 +75,14 @@ qplot(x = amount_funded, data = listings,
       binwidth = 1000, colour = I("#424242"), fill = I("#0077C0")) +
   scale_x_continuous(breaks = seq(0, 35000, 5000))
 ```
-Here we plot the count for each amount funded. We find that the majority of the people are looking for smaller loans, and it trails out towards the upper limits of ~35,000. Another interesting thing to note is the spikes at each interval of 5000.
-### Analysis of income range description
-
+  Here we plot the count for each amount funded. We find that the majority of the people are looking for smaller loans, and it trails out towards the upper limits of ~35,000. Another interesting thing to note is the spikes at each interval of 5000.
 
 
 ```{r, echo = FALSE}
 qplot(x = income_range_description, data = listings, fill = I("#0077C0")) +
   scale_x_discrete(limits = c("Not employed", "$0", "$1-24,999", "$25,000-49,999", "$50,000-74,999", "$75,000-99,999", "$100,000+", "Not displayed"))
 ```
-Here we plot the distribution of the income ranges for the borrowers. We find that it does not necessarily follow a normal distribution, with the majority of the borrows have less than 75,000.
-
+Here we plot the distribution of the income ranges for the borrowers. We find that it does not necessarily follow a normal distribution, with the majority of the borrows have less than 75,000. Also it is interesting that there are very few non-employed people asking for loans. 
 
 For predictive purposes we will go ahead and assume that incomplete loans which are paid per schedule will be completed per schedule. Similarly, we will convert loans which are sold off to colleciton agencies as defaulted.
 ```{r, echo = FALSE}
@@ -119,8 +119,7 @@ listings$quarters <- as.integer(listings$quarters)
 
 ggplot(aes(x=quarters), data=listings) + geom_bar(aes(fill=factor(loan_status)))
 ```
-This bar chart is highly interesting, as it seems as if people tend to increasingly take out loans as the year progresses.
-
+This bar chart is highly interesting, as it seems as if people tend to increasingly take out loans as the year progresses. One notable aspect of the graph is that the highest volume quarter for loans is the fourth quarter. This could relate to the holiday season where there is added pressure to buy gifts. 
 
 ### Analysis By Monthly Quarter Exploration
 Additionally, it seems as if the rate of default is lower as the year progresses, especially in the last financial quarter. To test this hypothesis we will calculate and plot the actual numbers for proportion of default.
@@ -246,7 +245,7 @@ M12Ratio <- M12_1/M12
 monthsratio <- c(M1Ratio,M2Ratio,M3Ratio,M4Ratio,M5Ratio,M6Ratio,M7Ratio,M8Ratio,M9Ratio,M10Ratio,M11Ratio,M12Ratio)
 plot(monthsratio, type="o", col="blue")
 ```
-As suspected, the default rates of especially November and December are substantially lower than other months.
+As suspected, the default rates of especially November and December are substantially lower than other months. 
 
 ### Default Rate vs Borrow Rate vs Month: Arbitrage Opportunity
 
@@ -288,7 +287,7 @@ tapply(listings$loan_status, listings$day, mean)
 The results show that there does not seem to be a significant difference in rate of default varying between weekdays.
 
 Let's run it for a few other variables to see if we can find any interesting results.
-```{r}
+```{r , echo = FALSE}
 tapply(listings$borrower_rate, listings$day, mean)
 tapply(listings$amount_funded, listings$day, mean)
 tapply(listings$income_range, listings$day, mean)
@@ -333,7 +332,6 @@ plot
 ```
 Scorex: As the scorex increases, the likelihood of defaulting decreases. 
 
- 
 Prosper Score is a score from 1-11 with 1 being lowest risk. Because this is a score that we did not create we don't know what went into it. In addition the data they are using is probably the same data we are using so it does not provide any novel new information to the model. Lets remove it.
 ```{r}
 listings$prosper_score <- NULL
@@ -454,7 +452,7 @@ plot
 The majority are employed, self employed or other.
 
 Months employed had values less than 0, we remove them and set it back to the median month.
-```{r}
+```{r , echo = FALSE}
 
 #
 listings$months_employed[listings$months_employed <0] <- NA
@@ -535,11 +533,11 @@ stateByCount <- ggplot(StatesCount, aes(map_id = region)) +
   labs(x = "", y = "") +
   theme(legend.position = "bottom", 
         panel.background = element_blank()) +
-  ggtitle("States By Probability of Listings Default")
+  ggtitle("States By Count of Listings Default")
 
 stateByCount + fifty_states_inset_boxes() 
 ```
-We find that california is the most popular state, followed by texas and new york. This makes sense since they are the biggest states.
+We find that California is the most popular state, followed by Texas and New York. This makes sense since they are the states with the highest population. In addition North Dakota and Iowa dont have almost any users. Prosper's headquarters are in San Francisco, California so another reason might be that the marketing they do is around where the company is run. 
 
 ### States by Proportion of Default
 ```{r, echo = FALSE}
@@ -572,8 +570,7 @@ p <- ggplot(listingsByStates, aes(map_id = region)) +
 p + fifty_states_inset_boxes() 
 
 ```
-A look at the probability of default by states. We find that **
-
+A look at the probability of default by states. We find that some of the midwestern states such as Nevada had higher probabilitiy of defaults than the coastal states. 
 
 ## Cost of Living By State
 
@@ -688,11 +685,10 @@ After separating the cities into two groups, either in the top 500 gpd producing
 listings$first_recorded_credit_line <- as.character(listings$first_recorded_credit_line)
 listings$first_recorded_credit_line <- as.Date(listings$first_recorded_credit_line, "%m%d%Y")
 listings$first_recorded_credit_line <- as.numeric(Sys.Date() - listings$first_recorded_credit_line)
-
-
 ```
 
-
+## Data Cleaning
+As part of our exploration of our dataset, we find several variables to be irrelevant to further analysis. The variables deleted are found irrelevant as they are aggregate variables or identical variables.
 
 ### Aggregate Variable of delinquencies
 ```{r}
@@ -731,16 +727,7 @@ listingsample<- listings[, !(colnames(listings) %in% c("State", "region", "origi
 
 listing_no_agg<- listingsample[, !(colnames(listingsample) %in% c("scorex", "dti_wprosper_loan", "prosper_rating"))]
 
-
-
 ```
-
-
-
-
-
-
-
 ## Data Models
 
 # Data Prediction using Logistic Regression
@@ -802,7 +789,7 @@ As a result, we will run another regression without these summary variables
 # Getting Data Ready for Machine Learning Models
 
 Since our dataset is relatively small ~33,300 after cleaning and the proportion of our predictor variable is low ~13%, we refine our dataset to have a more equal distribution of the two outcomes. This will help prevent overfitting or poor classification results. From our datset, about 4292 default and 29008 do not default.
-```{r}
+```{r, echo = FALSE}
 default_listings <- listingsample[listingsample$loan_status == 1, ]
 no_default_listings <- listingsample[listingsample$loan_status == 0, ]
 
@@ -815,7 +802,11 @@ listingsample <- rbind(no_default_listings_sample, default_listings)
 
 ```
 
-```{r}
+
+Now we are randomizing the data, creating dummy variables for all the factors, and finally splitting the data into training and test data. 
+The training and test data we have set it up so that there is a 2:1 ratio of non-defaults to defaults because the proportion of defaults was so low. 
+
+```{r, echo = FALSE}
 # Randomizing  dataset
 set.seed(12345)
 listing_rand <- listingsample[order(runif(12892)),]
@@ -877,9 +868,8 @@ round(prop.table(table(test_data$loan_status)) * 100, 1)
 ```
 
 
-#accuracy function
 
-```{r}
+```{r , echo = FALSE}
 accuracy <- function(predicted, trueval, model, hideoutput = F) {
   stopifnot(length(predicted) == length(trueval))
   result <- sum(predicted == trueval) / length(predicted)
@@ -1100,5 +1090,4 @@ acc_mat <- data.frame(ModelName = names, accuracy = acc_predictions) %>% print
 dotchart(acc_predictions, labels = names, main = "Accuracy of the models", xlab = "Accuracy")
 
 ```
-
 
