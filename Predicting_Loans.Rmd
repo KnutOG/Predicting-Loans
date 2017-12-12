@@ -1,9 +1,13 @@
 ---
 title: "Group Project 2"
-author: "Knut Gjertsen"
+author: "Knut Gjertsen, Jake Close, Peter Kaplan, Annie Boehrer, Keshav "
 date: "12/3/2017"
 output: html_document
 ---
+
+
+## Introduction
+We were given a dataset from the Prosper Lending Site based on past loans and asked to see if we could predict if a loan would default or not. This would provide an opportunity for a potential lender to have a better return on their investment and understand what makes a loan "risky".
 
 
 ## Libraries and Data Setup 
@@ -332,28 +336,11 @@ plot
 ```
 Scorex: As the scorex increases, the likelihood of defaulting decreases. 
 
-Prosper Score is a score from 1-11 with 1 being lowest risk. Because this is a score that we did not create we don't know what went into it. In addition the data they are using is probably the same data we are using so it does not provide any novel new information to the model. Lets remove it.
-```{r}
-listings$prosper_score <- NULL
-```
-
-listings category ID is a category of the Loan but there is no description to go along with the IDs. This information might be useful though. NNot sure what to do with this.
-```{r}
-
-```
-
-Income range, Income Range Description, Stated Monthly Income. We don't want this datapoint to be overrepresented in the model. Therefore we only need one of these variables. Lets go with Stated Monthly Income since it is more granular than the broad income range. 
-TO DO: Some of the algorithms will find that they are highly correlated and won't "Count them as double"... which ones?
-
 
 ### Analysis by Stated Monthly Income
 
 ```{r, echo = FALSE}
 
-#??? why?
-
-#listings$income_range   <- NULL
-#listings$income_range_description  <- NULL
 
 income <- listings %>%
     group_by(stated_monthly_income) %>%
@@ -642,7 +629,8 @@ plot<-ggplot(data=lByListingTime, aes(x=listing_term, y=prop, fill = (listing_te
 plot 
 
 ```
-Income Range: As the scorex increases, the likelihood of defaulting decreases. **
+
+  Income Range: As the scorex increases, the likelihood of defaulting decreases. 
 Income Verifiable: Income without being verified are less likely of being defaulted. This is somewhat different than what we expected
 By listing term: The longer the listing term, the more likely a borrower is to default.
 
@@ -703,7 +691,6 @@ listings$delinq_agg <- listings$delinquencies_over30_days + 2*listings$delinquen
 #listingssample$borrower_city <- NULL   
 #listingssample$borrower_state <- NULL
 
-# TODO: convert first_recorded to date
 listings$borrower_rate <- NULL
 listings$number_of_days <- NULL 
 listings$principal_balance <- NULL
@@ -1071,11 +1058,6 @@ Kappa(table(rf_pred, test_data$loan_status))
 ```
 
 
-Stacked Model
-```{r}
-
-```
-
 ```{r}
 acc_predictions = c(a1,a2,a3,a4,a7,a8,a9 )
 #acc_predictions = c(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10)
@@ -1088,6 +1070,10 @@ acc_mat <- data.frame(ModelName = names, accuracy = acc_predictions) %>% print
 
 ```{r}
 dotchart(acc_predictions, labels = names, main = "Accuracy of the models", xlab = "Accuracy")
-
 ```
 
+
+
+## Conclusion
+
+We began by exploring the dataset and removing any NA variables or variables that are irrelevant to helping us discover the default rate. We then analyzed the data by building out data visualizations to explore how the different variables might influence the likelihood of defaulting. Major themes that we pursued included an analysis of how the time of year effected loan defaults and then further dove into a geographic analysis of how the location by which loans are taken out effected default rates. The major takeaway from these graphs was that most volume of loans were taken out in the fourth quarter, corresponding to the holiday season. In addition, we found an arbitrage opportunity by noting in December the borrower rate remained stagnant while the default rate decreased. In theory, one would therefore have a better return on their investment if they took out all of their loans in December. We then prepared the data for creating machine learning classification models and created 7 different models but unfortunately found the results to not be as accurate as expected. Our predictions were in line with predicting all those who would not default. We believe that there may have been an issue with either the cleaning or scaling of our dataset which caused the models to misperform. Although our models did not perform well, we are still able to provide valuable insight through our data exploration and subsequent visualization.
